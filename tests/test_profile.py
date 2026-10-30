@@ -20,7 +20,7 @@ def test_column_kinds():
             "plan": ["free", "pro"][i % 2],
             "revenue": str(i * 1.5),
             "active": i % 2 == 0,
-            "note": "a long free-text comment that nobody wants on a chart axis",
+            "note": "a long free text comment that nobody wants on a chart axis",
             "missing": None,
         }
         for i in range(10)
@@ -77,7 +77,7 @@ def test_to_number(value, expected):
         ("2026-10", datetime(2026, 10, 1)),
         ("2026-10-05T10:00:00Z", datetime(2026, 10, 5, 10)),
         ("2026-10-05T12:00:00+02:00", datetime(2026, 10, 5, 10)),  # converted to UTC
-        ("2026-10-05 10:00:00.5+00", datetime(2026, 10, 5, 10, 0, 0, 500000)),  # Postgres text
+        ("2026-10-05 10:00:00.5+00", datetime(2026, 10, 5, 10, 0, 0, 500000)),  # postgres text format
         ("10/31/2026", datetime(2026, 10, 31)),
         ("31.10.2026", datetime(2026, 10, 31)),
         ("free", None),

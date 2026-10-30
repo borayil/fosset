@@ -29,7 +29,7 @@
 <div id="chart"></div>
 <footer>
   <span id="pos"></span>
-  <span><kbd>← →</kbd> cycle · <kbd>S</kbd> save PNG · <kbd>Esc</kbd> close</span>
+  <span><kbd>← →</kbd> flip through · <kbd>s</kbd> save png · <kbd>esc</kbd> close</span>
 </footer>
 <div id="toast"></div>
 <script>__PLOTLY__</script>
@@ -38,7 +38,7 @@
 const charts = JSON.parse(document.getElementById("payload").textContent);
 const chart = document.getElementById("chart");
 
-// Validated categorical palette, stepped separately for each mode.
+// colorblind safe palette, tuned separately for light and dark
 const THEMES = {
   light: {
     surface: "#fcfcfb", ink: "#0b0b0b", ink2: "#52514e", muted: "#898781",
@@ -64,7 +64,7 @@ function themed(figure, t) {
       trace.line = { color, width: 2 };
       trace.marker = { color, size: 8, line: { color: t.surface, width: 2 } };
     } else if (trace.type === "bar" || trace.type === "histogram") {
-      // The surface-colored outline is the 2px gap between touching bars.
+      // an outline in the background color is what gives bars that little gap
       trace.marker = { color, line: { color: t.surface, width: 1 } };
       trace.textfont = { color: t.ink2 };
     } else if (trace.type === "indicator") {
@@ -87,7 +87,7 @@ function themed(figure, t) {
     legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: t.ink2 } },
     hoverlabel: { bgcolor: t.surface, bordercolor: t.axis, font: { color: t.ink } },
   });
-  // Title and subtitle sit at the top; the legend sits between them and the plot.
+  // title and subtitle up top, legend between them and the plot
   layout.title = {
     ...layout.title, x: 0, xref: "paper", xanchor: "left",
     y: 1, yref: "container", yanchor: "top", pad: { t: 24 },
@@ -104,7 +104,7 @@ function themed(figure, t) {
     if (layout[name].title) layout[name].title.font = { color: t.ink2 };
   }
 
-  // Cap bar thickness at 24px and let the rest of each slot be air.
+  // bars max out at 24px thick, the rest is breathing room
   const first = data[0];
   if (first && first.type === "bar") {
     const slot = (chart.clientHeight - layout.margin.t - layout.margin.b) / first.y.length;
@@ -141,7 +141,7 @@ async function save() {
     format: "png", width: chart.clientWidth, height: chart.clientHeight, scale: 2,
   });
   const path = await window.pywebview.api.save_png(url, current + 1);
-  toast(`Saved ${path}`);
+  toast(`saved to ${path}`);
 }
 
 addEventListener("keydown", (e) => {

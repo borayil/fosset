@@ -1,4 +1,4 @@
-"""Work out what kind of values each column holds."""
+"""figures out what kind of stuff each column holds"""
 
 import math
 import re
@@ -7,9 +7,9 @@ from datetime import datetime, timezone
 
 from fosset.readers import Table
 
-# Kinds are guessed from the first rows only, so big inputs stay fast.
+# only look at the first rows so big files stay fast
 SAMPLE_ROWS = 5000
-# A column takes a kind when at least this share of its values fit it.
+# a column gets a kind when 90% of its values fit it
 MATCH_SHARE = 0.9
 TEXT_MIN_LENGTH = 40
 
@@ -22,7 +22,7 @@ _DATE_FORMATS = ("%m/%d/%Y", "%d.%m.%Y", "%Y/%m/%d")
 class Column:
     name: str
     kind: str  # number | datetime | category | text | id | empty
-    count: int  # non-null values in the sample
+    count: int  # values that aren't empty, in the sample
     distinct: int
 
     @property
@@ -82,7 +82,7 @@ def to_number(value) -> float | None:
 
 
 def to_datetime(value) -> datetime | None:
-    """Parse common date strings into naive UTC datetimes (what the charts expect)."""
+    """parse common date strings into plain utc datetimes, which is what the charts want"""
     if not isinstance(value, str) or len(value) < 7:
         return None
     text = value.strip()

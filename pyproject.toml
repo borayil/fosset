@@ -1,7 +1,7 @@
 [project]
 name = "fosset"
 version = "0.1.0"
-description = "Instantly visualize JSON, CSV or XML data in a native window."
+description = "throw json, csv or xml at it and get charts"
 requires-python = ">=3.11"
 dependencies = [
     "plotly>=6.0",

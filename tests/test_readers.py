@@ -24,7 +24,7 @@ def test_detect_format(text, filename, expected):
     assert detect_format(text, filename) == expected
 
 
-# --- JSON ---------------------------------------------------------------
+# json
 
 
 def test_json_array_of_objects_flattens_nested_keys():
@@ -88,7 +88,7 @@ def test_rows_are_capped(monkeypatch):
     assert table.truncated
 
 
-# --- CSV ----------------------------------------------------------------
+# csv
 
 
 def test_csv_comma():
@@ -118,7 +118,7 @@ def test_empty_csv():
     assert read("", "csv").rows == []
 
 
-# --- XML ----------------------------------------------------------------
+# xml
 
 
 def test_xml_attribute_rows():
@@ -141,7 +141,7 @@ def test_xml_child_element_rows_with_nesting():
 
 
 def test_xml_prefers_records_nearest_the_root():
-    # Each order repeats <item>, but the orders are the records.
+    # each order repeats <item> but the orders are the actual rows
     text = "<orders>" + "<order><item>a</item><item>b</item><item>c</item></order>" * 2 + "</orders>"
     assert len(read(text, "xml").rows) == 2
 

@@ -1,1 +1,1 @@
-"""fosset: give it data, get a sensible chart in a few seconds."""
+"""give it data, get charts. that's it"""

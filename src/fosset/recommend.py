@@ -1,6 +1,6 @@
-"""Pick the most sensible charts for a table, and check chart specs against it.
+"""picks the charts that make the most sense for a table and checks specs against it.
 
-Specs come out ranked: most likely to be the chart you wanted first.
+best guess comes first.
 """
 
 from dataclasses import dataclass
@@ -28,7 +28,7 @@ def recommend(columns: dict[str, Column], n_rows: int) -> list[Spec]:
     dates = [c.name for c in cols if c.kind == "datetime"]
     categories = [c for c in cols if c.kind == "category" and c.distinct > 1]
     metrics = numbers[:MAX_METRICS]
-    # An id column means each row is one thing (an order, an event), so counting rows means something.
+    # an id column means each row is one thing (an order, an event), so counting rows actually means something
     entity_rows = any(c.kind == "id" for c in cols)
 
     specs = []
@@ -61,7 +61,7 @@ def recommend(columns: dict[str, Column], n_rows: int) -> list[Spec]:
             x, y = metrics[0], metrics[1]
             specs.append(Spec("scatter", x, (y,), title=f"{human(y)} vs {human(x, capital=False)}"))
 
-        # A histogram only helps on raw rows, not on one row per category or per day.
+        # histograms only make sense on raw rows, not one row per category or per day
         raw_rows = entity_rows or not categories or not categories[0].unique
         if metrics and n_rows >= 30 and raw_rows and (entity_rows or not dates):
             specs.append(Spec("hist", metrics[0], title=f"Distribution of {human(metrics[0], capital=False)}"))
@@ -72,7 +72,7 @@ def recommend(columns: dict[str, Column], n_rows: int) -> list[Spec]:
 
 
 def validate(spec: Spec, columns: dict[str, Column]) -> bool:
-    """The constraint check: every column must exist and fit the chart type."""
+    """the constraint check: every column has to exist and fit the chart type"""
     named = [n for n in (spec.x, spec.color, *spec.y) if n is not None]
     if any(n not in columns for n in named):
         return False
@@ -98,6 +98,6 @@ def validate(spec: Spec, columns: dict[str, Column]) -> bool:
 
 
 def human(name: str, capital: bool = True) -> str:
-    """signup_count -> Signup count (or signup count mid-sentence)"""
+    """turns signup_count into "Signup count", or "signup count" in the middle of a title"""
     text = name.replace("_", " ").replace(".", " ").strip()
     return text[:1].upper() + text[1:] if capital else text

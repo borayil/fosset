@@ -1,6 +1,6 @@
-"""Turn a chart spec plus the table into a Plotly figure.
+"""turns a chart spec plus the table into a plotly figure.
 
-Colors are left out on purpose: the viewer applies the light or dark theme.
+colors are left out on purpose, the viewer adds them for light or dark mode.
 """
 
 import math
@@ -17,7 +17,7 @@ MAX_BARS = 20
 MAX_LINES = 4
 MAX_TABLE_ROWS = 500
 MAX_LABEL = 40
-# Past this many distinct times, values are bucketed by hour, day or month.
+# more distinct times than this and we bucket them by hour, day, week or month
 MAX_POINTS = 500
 WEBGL_POINTS = 5000
 MEAN_WORDS = {"avg", "average", "mean", "rate", "ratio", "pct", "percent", "percentage", "share"}
@@ -50,16 +50,16 @@ def _line(spec, table, columns):
             series = _label(row.get(spec.color)) if spec.color else ""
             points.append((series, xv, v))
 
-    # Bucket raw timestamps (counts, or times with minutes) and very long series;
-    # leave already-aggregated daily or hourly series as they are.
+    # bucket raw timestamps and really long series, but leave daily or hourly
+    # series that are already rolled up alone
     unit = None
     raw_times = any(p[1].minute or p[1].second or p[1].microsecond for p in points) if is_date else False
     if is_date and points and (y is None or raw_times or len({p[1] for p in points}) > MAX_POINTS):
         unit = _time_unit(min(p[1] for p in points), max(p[1] for p in points))
         points = [(s, _truncate(xv, unit), v) for s, xv, v in points]
 
-    # Buckets with no rows are real zeros for sums and counts, so draw them instead of
-    # bridging the gap; averages over an empty bucket are unknown, so leave a gap.
+    # an empty bucket is a real zero for sums and counts, so draw it instead of
+    # connecting across. for averages we just don't know, so leave a gap
     buckets = _bucket_range(min(p[1] for p in points), max(p[1] for p in points), unit) if unit else None
 
     data, merged = [], False
@@ -207,7 +207,7 @@ def _table(spec, table, columns):
     return _figure(spec.title, data, subtitle)
 
 
-# --- helpers ------------------------------------------------------------
+# helpers
 
 
 def _figure(title, data, subtitle="", **layout):
@@ -218,7 +218,7 @@ def _figure(title, data, subtitle="", **layout):
 
 
 def _fold(points, limit):
-    """Keep the `limit` biggest series and merge the rest into one "Other" series."""
+    """keep the `limit` biggest series and lump the rest into one "Other" series"""
     by_series = defaultdict(list)
     for p in points:
         by_series[p[0]].append(p)
@@ -231,7 +231,7 @@ def _fold(points, limit):
 
 
 def _agg(metric: str | None) -> str:
-    """Averages, rates and shares are averaged; everything else is summed."""
+    """averages, rates and shares get averaged, everything else gets summed"""
     if metric is None:
         return "sum"
     words = re.split(r"[^a-z0-9]+", re.sub(r"([a-z])([A-Z])", r"\1_\2", metric).lower())
@@ -304,12 +304,12 @@ def plural(n: int, noun: str) -> str:
 
 
 def esc(text) -> str:
-    """Plotly renders a subset of HTML in text, so data must be escaped."""
+    """plotly renders some html in text, so escape anything that comes from the data"""
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
 def compact(value: float) -> str:
-    """1284 -> 1,284 · 12900 -> 12.9K · 4200000 -> 4.2M"""
+    """short number labels like 1,284 or 12.9K or 4.2M"""
     a = abs(value)
     if a < 1:
         return f"{value:.3g}"

@@ -1,4 +1,4 @@
-"""Read JSON, CSV or XML text into one flat table of rows."""
+"""reads json, csv or xml and flattens it into plain rows"""
 
 import csv
 import io
@@ -8,7 +8,7 @@ from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
-# Caps that keep the whole run inside the few-second budget.
+# limits so the whole thing stays fast
 MAX_BYTES = 25 * 1024 * 1024
 MAX_ROWS = 200_000
 
@@ -30,7 +30,7 @@ class Table:
 
 
 def detect_format(text: str, filename: str | None = None) -> str:
-    """Use the file extension when it is known, otherwise look at the content."""
+    """go by the file extension if we know it, otherwise peek at the content"""
     if filename:
         fmt = EXTENSIONS.get(Path(filename).suffix.lower())
         if fmt:
@@ -58,7 +58,7 @@ def read(text: str, fmt: str) -> Table:
     return Table(columns, records, truncated)
 
 
-# --- JSON ---------------------------------------------------------------
+# json
 
 
 def _json_records(text: str) -> list[dict]:
@@ -67,7 +67,7 @@ def _json_records(text: str) -> list[dict]:
     except json.JSONDecodeError as e:
         if e.msg != "Extra data":
             raise
-        # JSON Lines: one value per line.
+        # probably json lines, one object per line
         data = [json.loads(line) for line in text.splitlines() if line.strip()]
     return _records(data)
 
@@ -80,7 +80,7 @@ def _records(data) -> list[dict]:
             return _rows_from_lists(data)
         return [{"value": _scalar(x)} for x in data]
     if isinstance(data, dict):
-        # Exports often wrap the rows, e.g. {"data": [...], "meta": {...}}.
+        # exports love wrapping the rows, like {"data": [...], "meta": {...}}
         nested = _largest_record_list(data)
         if nested is not None:
             return [_flatten(x) for x in nested]
@@ -127,7 +127,7 @@ def _scalar(value):
     return json.dumps(value) if isinstance(value, (list, dict)) else value
 
 
-# --- CSV ----------------------------------------------------------------
+# csv
 
 
 def _csv_records(text: str) -> list[dict]:
@@ -147,7 +147,7 @@ def _csv_records(text: str) -> list[dict]:
     ]
 
 
-# --- XML ----------------------------------------------------------------
+# xml
 
 
 def _xml_records(text: str) -> list[dict]:
@@ -159,7 +159,7 @@ def _xml_records(text: str) -> list[dict]:
 
 
 def _record_group(root: ET.Element):
-    """Find the repeated element closest to the root: those are the records."""
+    """the repeated element closest to the root is probably the rows"""
     level = [root]
     while level:
         best = None
@@ -187,5 +187,5 @@ def _xml_flatten(el: ET.Element, prefix: str = "") -> dict:
 
 
 def _local(tag: str) -> str:
-    """Drop the namespace from a tag or attribute name."""
+    """drop the namespace from a tag or attribute name"""
     return tag.rsplit("}", 1)[-1]

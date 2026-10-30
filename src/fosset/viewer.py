@@ -1,4 +1,4 @@
-"""Show figures in a native window: arrow keys cycle, S saves a PNG, Esc closes."""
+"""the native window. arrows flip through charts, s saves a png, esc closes"""
 
 import base64
 import importlib.util
@@ -13,14 +13,14 @@ _TEMPLATE = Path(__file__).with_name("viewer.html")
 
 
 def build_html(figures: list[dict]) -> str:
-    # Escaping "<" keeps data from closing the <script> tag it is embedded in.
+    # escape < so nothing in the data can close the script tag
     payload = json.dumps(figures).replace("<", "\\u003c")
     html = _TEMPLATE.read_text().replace("__PLOTLY__", _plotly_js())
     return html.replace("__PAYLOAD__", payload)
 
 
 def show(figures: list[dict], title: str, stem: str, started: float | None = None) -> None:
-    import webview  # imported here because it is slow to load and only needed for the window
+    import webview  # slow to import, so only load it when we actually open a window
 
     api = _Api(stem, Path.cwd(), started)
     window = webview.create_window(title, html=build_html(figures), js_api=api, width=1100, height=720)
@@ -29,7 +29,7 @@ def show(figures: list[dict], title: str, stem: str, started: float | None = Non
 
 
 class _Api:
-    """Methods the page can call. Private attributes are not exposed to it."""
+    """stuff the page can call. underscore attributes stay hidden from it"""
 
     def __init__(self, stem: str, out_dir: Path, started: float | None):
         self._stem = re.sub(r"[^\w.-]", "_", stem) or "chart"
@@ -51,9 +51,9 @@ class _Api:
             print(f"first chart on screen: {time.perf_counter() - self._started:.2f}s", file=sys.stderr)
 
     def close(self) -> None:
-        # pywebview sends this call's return value back to the page after we return.
-        # Destroying the window first strands that reply and the process never exits,
-        # so destroy it only once this call's thread has finished.
+        # pywebview sends our return value back to the page after this returns. if the
+        # window is already gone by then the process just hangs forever, so wait for
+        # this call to wrap up before killing the window
         caller = threading.current_thread()
 
         def destroy():
@@ -64,7 +64,7 @@ class _Api:
 
 
 def _plotly_js() -> str:
-    # Use the plotly.js bundled with the plotly package, so nothing loads from the network.
+    # use the plotly.js that ships with the plotly package so nothing hits the network
     spec = importlib.util.find_spec("plotly")
     if spec is None or not spec.submodule_search_locations:
         raise RuntimeError("plotly is not installed")
