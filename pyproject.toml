@@ -1,0 +1,19 @@
+[project]
+name = "fosset"
+version = "0.1.0"
+description = "Instantly visualize JSON, CSV or XML data in a native window."
+requires-python = ">=3.11"
+dependencies = [
+    "plotly>=6.0",
+    "pywebview>=5.0",
+]
+
+[project.scripts]
+fosset = "fosset.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,320 @@
+"""Turn a chart spec plus the table into a Plotly figure.
+
+Colors are left out on purpose: the viewer applies the light or dark theme.
+"""
+
+import math
+import re
+import statistics
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+from fosset.profile import Column, to_datetime, to_number
+from fosset.readers import Table
+from fosset.recommend import Spec, human
+
+MAX_BARS = 20
+MAX_LINES = 4
+MAX_TABLE_ROWS = 500
+MAX_LABEL = 40
+# Past this many distinct times, values are bucketed by hour, day or month.
+MAX_POINTS = 500
+WEBGL_POINTS = 5000
+MEAN_WORDS = {"avg", "average", "mean", "rate", "ratio", "pct", "percent", "percentage", "share"}
+
+
+def build(spec: Spec, table: Table, columns: dict[str, Column]) -> dict:
+    builders = {
+        "line": _line,
+        "bar": _bar,
+        "scatter": _scatter,
+        "hist": _hist,
+        "kpi": _kpi,
+        "table": _table,
+    }
+    return builders[spec.kind](spec, table, columns)
+
+
+def _line(spec, table, columns):
+    x = spec.x
+    is_date = columns[x].kind == "datetime"
+    parse_x = to_datetime if is_date else to_number
+    y = spec.y[0] if spec.y else None
+    agg = _agg(y)
+
+    points = []
+    for row in table.rows:
+        xv = parse_x(row.get(x))
+        v = 1.0 if y is None else to_number(row.get(y))
+        if xv is not None and v is not None:
+            series = _label(row.get(spec.color)) if spec.color else ""
+            points.append((series, xv, v))
+
+    # Bucket raw timestamps (counts, or times with minutes) and very long series;
+    # leave already-aggregated daily or hourly series as they are.
+    unit = None
+    raw_times = any(p[1].minute or p[1].second or p[1].microsecond for p in points) if is_date else False
+    if is_date and points and (y is None or raw_times or len({p[1] for p in points}) > MAX_POINTS):
+        unit = _time_unit(min(p[1] for p in points), max(p[1] for p in points))
+        points = [(s, _truncate(xv, unit), v) for s, xv, v in points]
+
+    # Buckets with no rows are real zeros for sums and counts, so draw them instead of
+    # bridging the gap; averages over an empty bucket are unknown, so leave a gap.
+    buckets = _bucket_range(min(p[1] for p in points), max(p[1] for p in points), unit) if unit else None
+
+    data, merged = [], False
+    for name, pts, is_other in _fold(points, MAX_LINES):
+        groups = defaultdict(list)
+        for _, xv, v in pts:
+            groups[xv].append(v)
+        merged = merged or any(len(vs) > 1 for vs in groups.values())
+        xs = buckets or sorted(groups)
+        empty = 0.0 if agg == "sum" else None
+        trace = {
+            "type": "scattergl" if len(xs) > WEBGL_POINTS else "scatter",
+            "mode": "lines+markers" if len(xs) <= 30 else "lines",
+            "name": esc(name),
+            "x": [_fmt_x(v) for v in xs],
+            "y": [_aggregate(groups[k], agg) if k in groups else empty for k in xs],
+            "hovertemplate": "%{y:,.2~f}",
+        }
+        if is_other:
+            trace["meta"] = "other"
+        data.append(trace)
+
+    if y is None:
+        subtitle = f"Rows per {unit}" if unit else ""
+    else:
+        subtitle = f"{_agg_word(agg)} per {unit or 'point'}" if merged else ""
+    return _figure(
+        spec.title,
+        data,
+        subtitle,
+        hovermode="x unified",
+        xaxis={"showspikes": True, "spikemode": "across", "spikesnap": "cursor"},
+        yaxis={"title": {"text": esc(human(y)) if y else "Rows"}, "rangemode": "tozero"},
+    )
+
+
+def _bar(spec, table, columns):
+    y = spec.y[0] if spec.y else None
+    agg = _agg(y)
+    groups = defaultdict(list)
+    for row in table.rows:
+        key = row.get(spec.x)
+        v = 1.0 if y is None else to_number(row.get(y))
+        if key not in (None, "") and v is not None:
+            groups[_label(key)].append(v)
+
+    totals = {k: _aggregate(vs, agg) for k, vs in groups.items()}
+    ranked = sorted(totals, key=totals.get, reverse=True)
+    bars = [(k, totals[k]) for k in ranked]
+    subtitle = [f"{_agg_word(agg)} per {human(spec.x).lower()}"] if y and any(len(vs) > 1 for vs in groups.values()) else []
+    if len(ranked) > MAX_BARS:
+        rest = ranked[MAX_BARS - 1:]
+        bars = bars[:MAX_BARS - 1]
+        bars.append((f"Other ({len(rest)})", _aggregate([v for k in rest for v in groups[k]], agg)))
+        subtitle.append(f"top {MAX_BARS - 1} + other")
+
+    values = [v for _, v in bars]
+    data = [{
+        "type": "bar",
+        "orientation": "h",
+        "y": [esc(_short(k)) for k, _ in bars],
+        "x": values,
+        "text": [compact(v) for v in values],
+        "textposition": "outside",
+        "cliponaxis": False,
+        "hovertemplate": "<b>%{x:,.2~f}</b>  %{y}<extra></extra>",
+    }]
+    return _figure(
+        spec.title,
+        data,
+        " · ".join(subtitle),
+        hovermode="closest",
+        xaxis={"title": {"text": esc(human(y)) if y else "Rows"}},
+        yaxis={"type": "category", "autorange": "reversed", "automargin": True},
+    )
+
+
+def _scatter(spec, table, columns):
+    x, y = spec.x, spec.y[0]
+    pairs = [(to_number(r.get(x)), to_number(r.get(y))) for r in table.rows]
+    pairs = [(a, b) for a, b in pairs if a is not None and b is not None]
+    data = [{
+        "type": "scattergl" if len(pairs) > WEBGL_POINTS else "scatter",
+        "mode": "markers",
+        "x": [a for a, _ in pairs],
+        "y": [b for _, b in pairs],
+        "hovertemplate": f"{esc(human(x))} %{{x:,.2~f}}<br>{esc(human(y))} %{{y:,.2~f}}<extra></extra>",
+    }]
+    return _figure(
+        spec.title,
+        data,
+        hovermode="closest",
+        xaxis={"title": {"text": esc(human(x))}},
+        yaxis={"title": {"text": esc(human(y))}},
+    )
+
+
+def _hist(spec, table, columns):
+    values = [to_number(r.get(spec.x)) for r in table.rows]
+    data = [{
+        "type": "histogram",
+        "x": [v for v in values if v is not None],
+        "hovertemplate": "%{x}<br><b>%{y:,}</b> rows<extra></extra>",
+    }]
+    return _figure(
+        spec.title,
+        data,
+        hovermode="closest",
+        xaxis={"title": {"text": esc(human(spec.x))}},
+        yaxis={"title": {"text": "Rows"}},
+    )
+
+
+def _kpi(spec, table, columns):
+    row = table.rows[0]
+    tiles = [(name, to_number(row.get(name))) for name in spec.y]
+    tiles = [(name, v) for name, v in tiles if v is not None]
+    n_cols = min(len(tiles), 4)
+    data = [
+        {
+            "type": "indicator",
+            "mode": "number",
+            "value": v,
+            "title": {"text": esc(human(name))},
+            "number": {"valueformat": ",.2~f" if abs(v) < 10_000 else ".3~s"},
+            "domain": {"row": i // n_cols, "column": i % n_cols},
+        }
+        for i, (name, v) in enumerate(tiles)
+    ]
+    grid = {"rows": math.ceil(len(tiles) / n_cols), "columns": n_cols, "pattern": "independent"}
+    return _figure(spec.title, data, grid=grid)
+
+
+def _table(spec, table, columns):
+    rows = table.rows[:MAX_TABLE_ROWS]
+    if len(table.rows) > len(rows):
+        subtitle = f"First {len(rows):,} of {len(table.rows):,} rows"
+    else:
+        subtitle = plural(len(rows), "row")
+    data = [{
+        "type": "table",
+        "header": {"values": [esc(c) for c in table.columns]},
+        "cells": {"values": [[_cell(r.get(c)) for r in rows] for c in table.columns]},
+    }]
+    return _figure(spec.title, data, subtitle)
+
+
+# --- helpers ------------------------------------------------------------
+
+
+def _figure(title, data, subtitle="", **layout):
+    title_layout = {"text": esc(title)}
+    if subtitle:
+        title_layout["subtitle"] = {"text": esc(subtitle)}
+    return {"data": data, "layout": {"title": title_layout, "showlegend": len(data) > 1, **layout}}
+
+
+def _fold(points, limit):
+    """Keep the `limit` biggest series and merge the rest into one "Other" series."""
+    by_series = defaultdict(list)
+    for p in points:
+        by_series[p[0]].append(p)
+    ranked = sorted(by_series, key=lambda s: sum(abs(p[2]) for p in by_series[s]), reverse=True)
+    out = [(name, by_series[name], False) for name in ranked[:limit]]
+    rest = ranked[limit:]
+    if rest:
+        out.append((f"Other ({len(rest)})", [p for name in rest for p in by_series[name]], True))
+    return out
+
+
+def _agg(metric: str | None) -> str:
+    """Averages, rates and shares are averaged; everything else is summed."""
+    if metric is None:
+        return "sum"
+    words = re.split(r"[^a-z0-9]+", re.sub(r"([a-z])([A-Z])", r"\1_\2", metric).lower())
+    return "mean" if MEAN_WORDS.intersection(words) else "sum"
+
+
+def _agg_word(agg: str) -> str:
+    return "Average" if agg == "mean" else "Sum"
+
+
+def _aggregate(values: list[float], agg: str) -> float:
+    return statistics.fmean(values) if agg == "mean" else math.fsum(values)
+
+
+def _time_unit(lo: datetime, hi: datetime) -> str:
+    span = hi - lo
+    if span <= timedelta(days=2):
+        return "hour"
+    if span <= timedelta(days=60):
+        return "day"
+    if span <= timedelta(days=366):
+        return "week"
+    return "month"
+
+
+def _truncate(dt: datetime, unit: str) -> datetime:
+    dt = dt.replace(minute=0, second=0, microsecond=0)
+    if unit != "hour":
+        dt = dt.replace(hour=0)
+    if unit == "week":
+        dt -= timedelta(days=dt.weekday())
+    if unit == "month":
+        dt = dt.replace(day=1)
+    return dt
+
+
+def _bucket_range(lo: datetime, hi: datetime, unit: str) -> list[datetime]:
+    out, current = [], lo
+    while current <= hi:
+        out.append(current)
+        if unit == "month":
+            current = current.replace(year=current.year + current.month // 12, month=current.month % 12 + 1)
+        else:
+            current += {"hour": timedelta(hours=1), "day": timedelta(days=1), "week": timedelta(weeks=1)}[unit]
+    return out
+
+
+def _fmt_x(value):
+    if isinstance(value, datetime):
+        if value.time() == datetime.min.time():
+            return value.date().isoformat()
+        return value.isoformat(sep=" ")
+    return value
+
+
+def _label(value) -> str:
+    return "(empty)" if value in (None, "") else str(value)
+
+
+def _short(text: str) -> str:
+    return text if len(text) <= MAX_LABEL else text[:MAX_LABEL - 1] + "…"
+
+
+def _cell(value) -> str:
+    return "" if value is None else esc(_short(str(value)))
+
+
+def plural(n: int, noun: str) -> str:
+    return f"{n:,} {noun}" if n == 1 else f"{n:,} {noun}s"
+
+
+def esc(text) -> str:
+    """Plotly renders a subset of HTML in text, so data must be escaped."""
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def compact(value: float) -> str:
+    """1284 -> 1,284 · 12900 -> 12.9K · 4200000 -> 4.2M"""
+    a = abs(value)
+    if a < 1:
+        return f"{value:.3g}"
+    if a < 10_000:
+        return f"{int(value):,}" if value == int(value) else f"{value:,.2f}".rstrip("0").rstrip(".")
+    for div, suffix in ((1e9, "B"), (1e6, "M"), (1e3, "K")):
+        if a >= div:
+            return f"{value / div:.1f}".rstrip("0").rstrip(".") + suffix

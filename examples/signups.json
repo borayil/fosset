@@ -1,0 +1,677 @@
+[
+  {
+    "day": "2026-09-01",
+    "plan": "free",
+    "signups": 115
+  },
+  {
+    "day": "2026-09-01",
+    "plan": "pro",
+    "signups": 37
+  },
+  {
+    "day": "2026-09-01",
+    "plan": "team",
+    "signups": 8
+  },
+  {
+    "day": "2026-09-02",
+    "plan": "free",
+    "signups": 116
+  },
+  {
+    "day": "2026-09-02",
+    "plan": "pro",
+    "signups": 30
+  },
+  {
+    "day": "2026-09-02",
+    "plan": "team",
+    "signups": 8
+  },
+  {
+    "day": "2026-09-03",
+    "plan": "free",
+    "signups": 144
+  },
+  {
+    "day": "2026-09-03",
+    "plan": "pro",
+    "signups": 38
+  },
+  {
+    "day": "2026-09-03",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-04",
+    "plan": "free",
+    "signups": 130
+  },
+  {
+    "day": "2026-09-04",
+    "plan": "pro",
+    "signups": 38
+  },
+  {
+    "day": "2026-09-04",
+    "plan": "team",
+    "signups": 9
+  },
+  {
+    "day": "2026-09-05",
+    "plan": "free",
+    "signups": 98
+  },
+  {
+    "day": "2026-09-05",
+    "plan": "pro",
+    "signups": 41
+  },
+  {
+    "day": "2026-09-05",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-06",
+    "plan": "free",
+    "signups": 138
+  },
+  {
+    "day": "2026-09-06",
+    "plan": "pro",
+    "signups": 29
+  },
+  {
+    "day": "2026-09-06",
+    "plan": "team",
+    "signups": 7
+  },
+  {
+    "day": "2026-09-07",
+    "plan": "free",
+    "signups": 115
+  },
+  {
+    "day": "2026-09-07",
+    "plan": "pro",
+    "signups": 36
+  },
+  {
+    "day": "2026-09-07",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-08",
+    "plan": "free",
+    "signups": 133
+  },
+  {
+    "day": "2026-09-08",
+    "plan": "pro",
+    "signups": 41
+  },
+  {
+    "day": "2026-09-08",
+    "plan": "team",
+    "signups": 9
+  },
+  {
+    "day": "2026-09-09",
+    "plan": "free",
+    "signups": 141
+  },
+  {
+    "day": "2026-09-09",
+    "plan": "pro",
+    "signups": 41
+  },
+  {
+    "day": "2026-09-09",
+    "plan": "team",
+    "signups": 9
+  },
+  {
+    "day": "2026-09-10",
+    "plan": "free",
+    "signups": 168
+  },
+  {
+    "day": "2026-09-10",
+    "plan": "pro",
+    "signups": 43
+  },
+  {
+    "day": "2026-09-10",
+    "plan": "team",
+    "signups": 11
+  },
+  {
+    "day": "2026-09-11",
+    "plan": "free",
+    "signups": 128
+  },
+  {
+    "day": "2026-09-11",
+    "plan": "pro",
+    "signups": 36
+  },
+  {
+    "day": "2026-09-11",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-12",
+    "plan": "free",
+    "signups": 140
+  },
+  {
+    "day": "2026-09-12",
+    "plan": "pro",
+    "signups": 44
+  },
+  {
+    "day": "2026-09-12",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-13",
+    "plan": "free",
+    "signups": 135
+  },
+  {
+    "day": "2026-09-13",
+    "plan": "pro",
+    "signups": 36
+  },
+  {
+    "day": "2026-09-13",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-14",
+    "plan": "free",
+    "signups": 167
+  },
+  {
+    "day": "2026-09-14",
+    "plan": "pro",
+    "signups": 38
+  },
+  {
+    "day": "2026-09-14",
+    "plan": "team",
+    "signups": 11
+  },
+  {
+    "day": "2026-09-15",
+    "plan": "free",
+    "signups": 155
+  },
+  {
+    "day": "2026-09-15",
+    "plan": "pro",
+    "signups": 35
+  },
+  {
+    "day": "2026-09-15",
+    "plan": "team",
+    "signups": 11
+  },
+  {
+    "day": "2026-09-16",
+    "plan": "free",
+    "signups": 173
+  },
+  {
+    "day": "2026-09-16",
+    "plan": "pro",
+    "signups": 33
+  },
+  {
+    "day": "2026-09-16",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-17",
+    "plan": "free",
+    "signups": 150
+  },
+  {
+    "day": "2026-09-17",
+    "plan": "pro",
+    "signups": 40
+  },
+  {
+    "day": "2026-09-17",
+    "plan": "team",
+    "signups": 12
+  },
+  {
+    "day": "2026-09-18",
+    "plan": "free",
+    "signups": 152
+  },
+  {
+    "day": "2026-09-18",
+    "plan": "pro",
+    "signups": 37
+  },
+  {
+    "day": "2026-09-18",
+    "plan": "team",
+    "signups": 12
+  },
+  {
+    "day": "2026-09-19",
+    "plan": "free",
+    "signups": 168
+  },
+  {
+    "day": "2026-09-19",
+    "plan": "pro",
+    "signups": 50
+  },
+  {
+    "day": "2026-09-19",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-09-20",
+    "plan": "free",
+    "signups": 164
+  },
+  {
+    "day": "2026-09-20",
+    "plan": "pro",
+    "signups": 46
+  },
+  {
+    "day": "2026-09-20",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-21",
+    "plan": "free",
+    "signups": 171
+  },
+  {
+    "day": "2026-09-21",
+    "plan": "pro",
+    "signups": 43
+  },
+  {
+    "day": "2026-09-21",
+    "plan": "team",
+    "signups": 11
+  },
+  {
+    "day": "2026-09-22",
+    "plan": "free",
+    "signups": 139
+  },
+  {
+    "day": "2026-09-22",
+    "plan": "pro",
+    "signups": 42
+  },
+  {
+    "day": "2026-09-22",
+    "plan": "team",
+    "signups": 11
+  },
+  {
+    "day": "2026-09-23",
+    "plan": "free",
+    "signups": 187
+  },
+  {
+    "day": "2026-09-23",
+    "plan": "pro",
+    "signups": 37
+  },
+  {
+    "day": "2026-09-23",
+    "plan": "team",
+    "signups": 10
+  },
+  {
+    "day": "2026-09-24",
+    "plan": "free",
+    "signups": 170
+  },
+  {
+    "day": "2026-09-24",
+    "plan": "pro",
+    "signups": 55
+  },
+  {
+    "day": "2026-09-24",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-09-25",
+    "plan": "free",
+    "signups": 133
+  },
+  {
+    "day": "2026-09-25",
+    "plan": "pro",
+    "signups": 35
+  },
+  {
+    "day": "2026-09-25",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-09-26",
+    "plan": "free",
+    "signups": 156
+  },
+  {
+    "day": "2026-09-26",
+    "plan": "pro",
+    "signups": 43
+  },
+  {
+    "day": "2026-09-26",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-09-27",
+    "plan": "free",
+    "signups": 191
+  },
+  {
+    "day": "2026-09-27",
+    "plan": "pro",
+    "signups": 50
+  },
+  {
+    "day": "2026-09-27",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-09-28",
+    "plan": "free",
+    "signups": 181
+  },
+  {
+    "day": "2026-09-28",
+    "plan": "pro",
+    "signups": 59
+  },
+  {
+    "day": "2026-09-28",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-09-29",
+    "plan": "free",
+    "signups": 185
+  },
+  {
+    "day": "2026-09-29",
+    "plan": "pro",
+    "signups": 54
+  },
+  {
+    "day": "2026-09-29",
+    "plan": "team",
+    "signups": 11
+  },
+  {
+    "day": "2026-09-30",
+    "plan": "free",
+    "signups": 201
+  },
+  {
+    "day": "2026-09-30",
+    "plan": "pro",
+    "signups": 56
+  },
+  {
+    "day": "2026-09-30",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-10-01",
+    "plan": "free",
+    "signups": 144
+  },
+  {
+    "day": "2026-10-01",
+    "plan": "pro",
+    "signups": 49
+  },
+  {
+    "day": "2026-10-01",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-10-02",
+    "plan": "free",
+    "signups": 149
+  },
+  {
+    "day": "2026-10-02",
+    "plan": "pro",
+    "signups": 52
+  },
+  {
+    "day": "2026-10-02",
+    "plan": "team",
+    "signups": 15
+  },
+  {
+    "day": "2026-10-03",
+    "plan": "free",
+    "signups": 160
+  },
+  {
+    "day": "2026-10-03",
+    "plan": "pro",
+    "signups": 62
+  },
+  {
+    "day": "2026-10-03",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-10-04",
+    "plan": "free",
+    "signups": 183
+  },
+  {
+    "day": "2026-10-04",
+    "plan": "pro",
+    "signups": 55
+  },
+  {
+    "day": "2026-10-04",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-10-05",
+    "plan": "free",
+    "signups": 190
+  },
+  {
+    "day": "2026-10-05",
+    "plan": "pro",
+    "signups": 60
+  },
+  {
+    "day": "2026-10-05",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-10-06",
+    "plan": "free",
+    "signups": 182
+  },
+  {
+    "day": "2026-10-06",
+    "plan": "pro",
+    "signups": 60
+  },
+  {
+    "day": "2026-10-06",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-10-07",
+    "plan": "free",
+    "signups": 176
+  },
+  {
+    "day": "2026-10-07",
+    "plan": "pro",
+    "signups": 60
+  },
+  {
+    "day": "2026-10-07",
+    "plan": "team",
+    "signups": 16
+  },
+  {
+    "day": "2026-10-08",
+    "plan": "free",
+    "signups": 185
+  },
+  {
+    "day": "2026-10-08",
+    "plan": "pro",
+    "signups": 49
+  },
+  {
+    "day": "2026-10-08",
+    "plan": "team",
+    "signups": 14
+  },
+  {
+    "day": "2026-10-09",
+    "plan": "free",
+    "signups": 193
+  },
+  {
+    "day": "2026-10-09",
+    "plan": "pro",
+    "signups": 55
+  },
+  {
+    "day": "2026-10-09",
+    "plan": "team",
+    "signups": 16
+  },
+  {
+    "day": "2026-10-10",
+    "plan": "free",
+    "signups": 179
+  },
+  {
+    "day": "2026-10-10",
+    "plan": "pro",
+    "signups": 64
+  },
+  {
+    "day": "2026-10-10",
+    "plan": "team",
+    "signups": 13
+  },
+  {
+    "day": "2026-10-11",
+    "plan": "free",
+    "signups": 185
+  },
+  {
+    "day": "2026-10-11",
+    "plan": "pro",
+    "signups": 61
+  },
+  {
+    "day": "2026-10-11",
+    "plan": "team",
+    "signups": 16
+  },
+  {
+    "day": "2026-10-12",
+    "plan": "free",
+    "signups": 217
+  },
+  {
+    "day": "2026-10-12",
+    "plan": "pro",
+    "signups": 60
+  },
+  {
+    "day": "2026-10-12",
+    "plan": "team",
+    "signups": 15
+  },
+  {
+    "day": "2026-10-13",
+    "plan": "free",
+    "signups": 206
+  },
+  {
+    "day": "2026-10-13",
+    "plan": "pro",
+    "signups": 62
+  },
+  {
+    "day": "2026-10-13",
+    "plan": "team",
+    "signups": 15
+  },
+  {
+    "day": "2026-10-14",
+    "plan": "free",
+    "signups": 210
+  },
+  {
+    "day": "2026-10-14",
+    "plan": "pro",
+    "signups": 63
+  },
+  {
+    "day": "2026-10-14",
+    "plan": "team",
+    "signups": 15
+  },
+  {
+    "day": "2026-10-15",
+    "plan": "free",
+    "signups": 221
+  },
+  {
+    "day": "2026-10-15",
+    "plan": "pro",
+    "signups": 63
+  },
+  {
+    "day": "2026-10-15",
+    "plan": "team",
+    "signups": 18
+  }
+]

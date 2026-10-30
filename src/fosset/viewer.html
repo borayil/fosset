@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    display: flex; flex-direction: column;
+    background: var(--surface); color: var(--ink2);
+    font: 13px system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  #chart { flex: 1; min-height: 0; }
+  footer {
+    display: flex; justify-content: space-between;
+    padding: 8px 16px; color: var(--muted);
+    border-top: 1px solid var(--grid);
+  }
+  kbd { font: inherit; color: var(--ink2); }
+  #toast {
+    position: fixed; bottom: 48px; left: 50%; transform: translateX(-50%);
+    padding: 6px 12px; border-radius: 6px;
+    background: var(--ink); color: var(--surface);
+    opacity: 0; transition: opacity 0.2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div id="chart"></div>
+<footer>
+  <span id="pos"></span>
+  <span><kbd>← →</kbd> cycle · <kbd>S</kbd> save PNG · <kbd>Esc</kbd> close</span>
+</footer>
+<div id="toast"></div>
+<script>__PLOTLY__</script>
+<script id="payload" type="application/json">__PAYLOAD__</script>
+<script>
+const charts = JSON.parse(document.getElementById("payload").textContent);
+const chart = document.getElementById("chart");
+
+// Validated categorical palette, stepped separately for each mode.
+const THEMES = {
+  light: {
+    surface: "#fcfcfb", ink: "#0b0b0b", ink2: "#52514e", muted: "#898781",
+    grid: "#e1e0d9", axis: "#c3c2b7",
+    series: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"],
+  },
+  dark: {
+    surface: "#1a1a19", ink: "#f0efec", ink2: "#c3c2b7", muted: "#898781",
+    grid: "#2c2c2a", axis: "#383835",
+    series: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181"],
+  },
+};
+const darkMode = matchMedia("(prefers-color-scheme: dark)");
+let current = 0;
+
+function themed(figure, t) {
+  const data = structuredClone(figure.data);
+  const layout = structuredClone(figure.layout);
+  let slot = 0;
+  for (const trace of data) {
+    const color = trace.meta === "other" ? t.muted : t.series[slot++];
+    if (trace.type === "scatter" || trace.type === "scattergl") {
+      trace.line = { color, width: 2 };
+      trace.marker = { color, size: 8, line: { color: t.surface, width: 2 } };
+    } else if (trace.type === "bar" || trace.type === "histogram") {
+      // The surface-colored outline is the 2px gap between touching bars.
+      trace.marker = { color, line: { color: t.surface, width: 1 } };
+      trace.textfont = { color: t.ink2 };
+    } else if (trace.type === "indicator") {
+      trace.number = { ...trace.number, font: { color: t.ink, size: 44 } };
+      trace.title = { ...trace.title, font: { color: t.ink2, size: 14 } };
+    } else if (trace.type === "table") {
+      trace.header = { ...trace.header, align: "left", height: 28,
+        fill: { color: t.grid }, line: { color: t.grid }, font: { color: t.ink, size: 12 } };
+      trace.cells = { ...trace.cells, align: "left", height: 26,
+        fill: { color: t.surface }, line: { color: t.grid }, font: { color: t.ink2, size: 12 } };
+    }
+  }
+
+  Object.assign(layout, {
+    paper_bgcolor: t.surface,
+    plot_bgcolor: t.surface,
+    font: { family: 'system-ui, -apple-system, "Segoe UI", sans-serif', color: t.ink2, size: 13 },
+    margin: { t: 112, r: 64, b: 56, l: 72 },
+    barcornerradius: 4,
+    legend: { orientation: "h", x: 0, y: 1.02, yanchor: "bottom", font: { color: t.ink2 } },
+    hoverlabel: { bgcolor: t.surface, bordercolor: t.axis, font: { color: t.ink } },
+  });
+  // Title and subtitle sit at the top; the legend sits between them and the plot.
+  layout.title = {
+    ...layout.title, x: 0, xref: "paper", xanchor: "left",
+    y: 1, yref: "container", yanchor: "top", pad: { t: 24 },
+    font: { color: t.ink, size: 17 },
+  };
+  if (layout.title.subtitle) layout.title.subtitle.font = { color: t.muted, size: 13 };
+  for (const name of ["xaxis", "yaxis"]) {
+    layout[name] = {
+      gridcolor: t.grid, linecolor: t.axis, zerolinecolor: t.axis,
+      tickfont: { color: t.muted }, separatethousands: true, automargin: true,
+      spikecolor: t.muted, spikethickness: 1, spikedash: "solid",
+      ...layout[name],
+    };
+    if (layout[name].title) layout[name].title.font = { color: t.ink2 };
+  }
+
+  // Cap bar thickness at 24px and let the rest of each slot be air.
+  const first = data[0];
+  if (first && first.type === "bar") {
+    const slot = (chart.clientHeight - layout.margin.t - layout.margin.b) / first.y.length;
+    layout.bargap = Math.max(0.2, 1 - 24 / slot);
+  }
+  return { data, layout };
+}
+
+function render() {
+  const t = darkMode.matches ? THEMES.dark : THEMES.light;
+  for (const [key, value] of Object.entries(t)) {
+    if (typeof value === "string") document.body.style.setProperty(`--${key}`, value);
+  }
+  const { data, layout } = themed(charts[current], t);
+  document.getElementById("pos").textContent = `${current + 1} / ${charts.length}`;
+  return Plotly.react(chart, data, layout, { displayModeBar: false });
+}
+
+function go(step) {
+  current = (current + step + charts.length) % charts.length;
+  render();
+}
+
+function toast(text) {
+  const el = document.getElementById("toast");
+  el.textContent = text;
+  el.classList.add("show");
+  clearTimeout(el.timer);
+  el.timer = setTimeout(() => el.classList.remove("show"), 2000);
+}
+
+async function save() {
+  const url = await Plotly.toImage(chart, {
+    format: "png", width: chart.clientWidth, height: chart.clientHeight, scale: 2,
+  });
+  const path = await window.pywebview.api.save_png(url, current + 1);
+  toast(`Saved ${path}`);
+}
+
+addEventListener("keydown", (e) => {
+  if (e.key === "ArrowRight") go(1);
+  else if (e.key === "ArrowLeft") go(-1);
+  else if (e.key === "s" || e.key === "S") save();
+  else if (e.key === "Escape" || e.key === "q") window.pywebview.api.close();
+});
+addEventListener("resize", render);
+darkMode.addEventListener("change", render);
+
+const firstRender = render();
+const notify = () => firstRender.then(() => window.pywebview.api.rendered());
+if (window.pywebview && window.pywebview.api) notify();
+else addEventListener("pywebviewready", notify, { once: true });
+</script>
+</body>
+</html>

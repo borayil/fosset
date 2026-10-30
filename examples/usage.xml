@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<report>
+  <row feature="search" calls="3851" avg_latency_ms="85"/>
+  <row feature="export" calls="2811" avg_latency_ms="217"/>
+  <row feature="login" calls="5357" avg_latency_ms="46"/>
+  <row feature="upload" calls="7661" avg_latency_ms="350"/>
+  <row feature="share" calls="7054" avg_latency_ms="298"/>
+  <row feature="billing" calls="8319" avg_latency_ms="109"/>
+  <row feature="invite" calls="4180" avg_latency_ms="439"/>
+</report>
