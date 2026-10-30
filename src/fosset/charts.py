@@ -42,21 +42,22 @@ def _line(spec, table, columns):
     y = spec.y[0] if spec.y else None
     agg = _agg(y)
 
-    points = []
-    for row in table.rows:
-        xv = parse_x(row.get(x))
-        v = 1.0 if y is None else to_number(row.get(y))
-        if xv is not None and v is not None:
-            series = _label(row.get(spec.color)) if spec.color else ""
-            points.append((series, xv, v))
+    xs = _column(table, x, parse_x)
+    values = _column(table, y, to_number) if y else None
+    series = _column(table, spec.color, _label) if spec.color else None
+    keep = [i for i, xv in enumerate(xs) if xv is not None and (values is None or values[i] is not None)]
 
     # bucket raw timestamps and really long series, but leave daily or hourly
     # series that are already rolled up alone
     unit = None
-    raw_times = any(p[1].minute or p[1].second or p[1].microsecond for p in points) if is_date else False
-    if is_date and points and (y is None or raw_times or len({p[1] for p in points}) > MAX_POINTS):
-        unit = _time_unit(min(p[1] for p in points), max(p[1] for p in points))
-        points = [(s, _truncate(xv, unit), v) for s, xv, v in points]
+    if is_date and keep:
+        raw_times = any(xs[i].minute or xs[i].second or xs[i].microsecond for i in keep)
+        if y is None or raw_times or len({xs[i] for i in keep}) > MAX_POINTS:
+            unit = _time_unit(min(xs[i] for i in keep), max(xs[i] for i in keep))
+            parsed = xs
+            xs = _cached(table, ("bucket", x, unit), lambda: [None if v is None else _truncate(v, unit) for v in parsed])
+
+    points = [(series[i] if series else "", xs[i], values[i] if values else 1.0) for i in keep]
 
     # an empty bucket is a real zero for sums and counts, so draw it instead of
     # connecting across. for averages we just don't know, so leave a gap
@@ -99,12 +100,13 @@ def _line(spec, table, columns):
 def _bar(spec, table, columns):
     y = spec.y[0] if spec.y else None
     agg = _agg(y)
+    keys = _column(table, spec.x, _key)
+    values = _column(table, y, to_number) if y else None
     groups = defaultdict(list)
-    for row in table.rows:
-        key = row.get(spec.x)
-        v = 1.0 if y is None else to_number(row.get(y))
-        if key not in (None, "") and v is not None:
-            groups[_label(key)].append(v)
+    for i, key in enumerate(keys):
+        v = 1.0 if values is None else values[i]
+        if key is not None and v is not None:
+            groups[key].append(v)
 
     totals = {k: _aggregate(vs, agg) for k, vs in groups.items()}
     ranked = sorted(totals, key=totals.get, reverse=True)
@@ -139,7 +141,7 @@ def _bar(spec, table, columns):
 
 def _scatter(spec, table, columns):
     x, y = spec.x, spec.y[0]
-    pairs = [(to_number(r.get(x)), to_number(r.get(y))) for r in table.rows]
+    pairs = zip(_column(table, x, to_number), _column(table, y, to_number))
     pairs = [(a, b) for a, b in pairs if a is not None and b is not None]
     data = [{
         "type": "scattergl" if len(pairs) > WEBGL_POINTS else "scatter",
@@ -158,10 +160,9 @@ def _scatter(spec, table, columns):
 
 
 def _hist(spec, table, columns):
-    values = [to_number(r.get(spec.x)) for r in table.rows]
     data = [{
         "type": "histogram",
-        "x": [v for v in values if v is not None],
+        "x": [v for v in _column(table, spec.x, to_number) if v is not None],
         "hovertemplate": "%{x}<br><b>%{y:,}</b> rows<extra></extra>",
     }]
     return _figure(
@@ -208,6 +209,17 @@ def _table(spec, table, columns):
 
 
 # helpers
+
+
+def _column(table, name, parse):
+    """parse a column once and reuse it for every chart, parsing is most of the work"""
+    return _cached(table, (name, parse), lambda: [parse(row.get(name)) for row in table.rows])
+
+
+def _cached(table, key, compute):
+    if key not in table.cache:
+        table.cache[key] = compute()
+    return table.cache[key]
 
 
 def _figure(title, data, subtitle="", **layout):
@@ -258,14 +270,12 @@ def _time_unit(lo: datetime, hi: datetime) -> str:
 
 
 def _truncate(dt: datetime, unit: str) -> datetime:
-    dt = dt.replace(minute=0, second=0, microsecond=0)
-    if unit != "hour":
-        dt = dt.replace(hour=0)
-    if unit == "week":
-        dt -= timedelta(days=dt.weekday())
+    if unit == "hour":
+        return datetime(dt.year, dt.month, dt.day, dt.hour)
     if unit == "month":
-        dt = dt.replace(day=1)
-    return dt
+        return datetime(dt.year, dt.month, 1)
+    day = datetime(dt.year, dt.month, dt.day)
+    return day - timedelta(days=day.weekday()) if unit == "week" else day
 
 
 def _bucket_range(lo: datetime, hi: datetime, unit: str) -> list[datetime]:
@@ -289,6 +299,10 @@ def _fmt_x(value):
 
 def _label(value) -> str:
     return "(empty)" if value in (None, "") else str(value)
+
+
+def _key(value) -> str | None:
+    return None if value in (None, "") else str(value)
 
 
 def _short(text: str) -> str:

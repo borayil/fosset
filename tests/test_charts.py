@@ -1,5 +1,6 @@
 import pytest
 
+from fosset import charts
 from fosset.charts import build, compact, esc
 from fosset.profile import profile
 from fosset.readers import Table
@@ -92,6 +93,18 @@ def test_table_caps_rows():
     fig = figure(Spec("table", title="Data"), rows)
     assert len(fig["data"][0]["cells"]["values"][0]) == 500
     assert fig["layout"]["title"]["subtitle"]["text"] == "First 500 of 600 rows"
+
+
+def test_columns_are_parsed_once_across_charts(monkeypatch):
+    calls = []
+    real = charts.to_datetime
+    monkeypatch.setattr(charts, "to_datetime", lambda v: calls.append(v) or real(v))
+    rows = [{"at": f"2026-10-0{d}T10:30:00", "n": d} for d in range(1, 6)]
+    table = Table(["at", "n"], rows)
+    columns = profile(table)
+    build(Spec("line", "at"), table, columns)
+    build(Spec("line", "at", ("n",)), table, columns)
+    assert len(calls) == len(rows)
 
 
 def test_labels_from_data_are_escaped():

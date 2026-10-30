@@ -5,7 +5,7 @@ import io
 import json
 import xml.etree.ElementTree as ET
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # limits so the whole thing stays fast
@@ -27,6 +27,8 @@ class Table:
     columns: list[str]
     rows: list[dict]
     truncated: bool = False
+    # parsed columns, shared by all the charts built from this table
+    cache: dict = field(default_factory=dict, repr=False, compare=False)
 
 
 def detect_format(text: str, filename: str | None = None) -> str:
