@@ -31,6 +31,18 @@ class Table:
     cache: dict = field(default_factory=dict, repr=False, compare=False)
 
 
+def load(path: str) -> tuple[str, str]:
+    """read a file as text, returning (text, file name)"""
+    with open(path, "rb") as f:
+        return decode(f.read(MAX_BYTES + 1)), Path(path).name
+
+
+def decode(data: bytes) -> str:
+    if len(data) > MAX_BYTES:
+        raise ValueError(f"that's over {MAX_BYTES // 2**20} MB, fosset keeps it small so it stays fast")
+    return data.decode("utf-8-sig", errors="replace")
+
+
 def detect_format(text: str, filename: str | None = None) -> str:
     """go by the file extension if we know it, otherwise peek at the content"""
     if filename:

@@ -18,6 +18,26 @@ uv tool install -e .
 fosset report.json
 ```
 
+a few more things it can do:
+
+```
+fosset report.json --png charts/              # also save every chart as a png
+fosset report.json --png charts/ --headless   # just the pngs, no window
+fosset report.json --html report.html         # a page you can open in any browser
+```
+
+## use it from claude code
+
+fosset is also a claude code plugin. claude picks the charts, a window pops up for you, and claude gets the numbers plus pngs of the charts back, so it sees what you see. no api key needed since claude is the llm here, and your data never leaves your machine.
+
+```
+/plugin install fosset --marketplace borayil/fosset
+```
+
+then just work like normal. when a query result, metrics dump, benchmark or cost breakdown shows up, claude charts it. or ask it to, or run `/fosset:visualize path/to/file.json`. comparing options for a decision works too, claude lays them out as rows and charts them.
+
+you need [uv](https://docs.astral.sh/uv/) installed. the very first start downloads fosset's dependencies (about 20s, once), after that it starts instantly. windows and pngs are macos only for now, anywhere else you get the numbers plus an html file you can open in a browser.
+
 ## in the window
 
 * ← → flips through the charts

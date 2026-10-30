@@ -1,17 +1,19 @@
 [project]
 name = "fosset"
-version = "0.1.0"
+version = "0.2.0"
 description = "throw json, csv or xml at it and get charts"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
     "anthropic>=2.3.0",
+    "mcp>=2.3.0",
     "plotly>=6.0",
     "pywebview>=5.0",
 ]
 
 [project.scripts]
 fosset = "fosset.cli:main"
+fosset-mcp = "fosset.mcp_server:main"
 
 [dependency-groups]
 dev = ["pytest>=8"]

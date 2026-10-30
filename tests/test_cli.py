@@ -1,10 +1,11 @@
 import io
+import json
 import sys
 from pathlib import Path
 
 import pytest
 
-from fosset import cli, llm
+from fosset import cli, llm, readers
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
@@ -15,19 +16,21 @@ ANSWER = {
 
 
 class Shown(list):
-    """every window that would have opened, plus the status and background job of the last one"""
+    """every window that would have opened, plus the options of the last one"""
 
     status = ""
     later = None
+    png_dir = None
+    headless = False
 
 
 @pytest.fixture
 def shown(monkeypatch):
     calls = Shown()
 
-    def fake_show(figures, title, stem, started, status="", later=None):
+    def fake_show(figures, title, stem, started, status="", later=None, png_dir=None, headless=False):
         calls.append((figures, title, stem))
-        calls.status, calls.later = status, later
+        calls.status, calls.later, calls.png_dir, calls.headless = status, later, png_dir, headless
 
     monkeypatch.setattr(cli, "show", fake_show)
     return calls
@@ -73,7 +76,7 @@ def test_bad_input_exits_with_a_message(tmp_path, shown):
 
 
 def test_oversized_input_is_refused(tmp_path, monkeypatch, shown):
-    monkeypatch.setattr(cli, "MAX_BYTES", 10)
+    monkeypatch.setattr(readers, "MAX_BYTES", 10)
     big = tmp_path / "big.csv"
     big.write_text("a\n" + "1\n" * 20)
     with pytest.raises(SystemExit, match="keeps it small"):
@@ -126,3 +129,33 @@ def test_broken_config_falls_back_to_rules(shown, capsys):
     cli.main([str(EXAMPLES / "signups.json")])
     assert shown.later is None
     assert "ignoring the llm config" in capsys.readouterr().err
+
+
+def test_specs_file_replaces_the_picks(shown, tmp_path, llm_on):
+    specs = tmp_path / "specs.json"
+    specs.write_text(json.dumps({"charts": [{"kind": "hist", "x": "signups", "y": [], "color": "", "title": "Spread"}],
+                                 "labels": []}))
+    cli.main([str(EXAMPLES / "signups.json"), "--specs", str(specs)])
+    figures, _, _ = shown[0]
+    assert figures[0]["layout"]["title"]["text"] == "Spread"
+    assert shown.later is None and not llm_on  # given picks mean no llm call
+
+
+def test_png_and_headless_are_passed_to_the_window(shown, tmp_path):
+    cli.main([str(EXAMPLES / "signups.json"), "--png", str(tmp_path / "out"), "--headless", "--title", "signups"])
+    assert shown.png_dir == tmp_path / "out"
+    assert shown.headless is True
+    assert shown[0][1] == "fosset · signups · 135 rows"
+
+
+def test_headless_needs_png(shown):
+    with pytest.raises(SystemExit):
+        cli.main([str(EXAMPLES / "signups.json"), "--headless"])
+
+
+def test_html_writes_a_page_and_opens_nothing(shown, tmp_path, capsys):
+    page = tmp_path / "charts.html"
+    cli.main([str(EXAMPLES / "orders.csv"), "--html", str(page)])
+    assert not shown
+    assert '"export": false' in page.read_text()
+    assert capsys.readouterr().out.strip() == str(page)

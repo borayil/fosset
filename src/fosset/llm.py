@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from fosset.profile import Column
-from fosset.recommend import Spec, validate
+from fosset.recommend import Spec, merge, validate
 
 CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "fosset" / "config.toml"
 CACHE_PATH = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "fosset" / "llm.json"
@@ -173,6 +173,14 @@ def to_specs(answer: dict, columns: dict[str, Column], n_rows: int) -> tuple[lis
         if item.get("column") in columns and item.get("label")
     }
     return specs, labels
+
+
+def apply_answer(answer: dict, columns: dict[str, Column], n_rows: int, rules: list[Spec]) -> list[Spec]:
+    """put the answer's picks first, rule picks after, and hand its labels to the columns"""
+    specs, labels = to_specs(answer, columns, n_rows)
+    for name, label in labels.items():
+        columns[name].label = label
+    return merge(specs, rules)
 
 
 def _ask_anthropic(config: Config, summary: dict) -> str:

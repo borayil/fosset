@@ -157,3 +157,15 @@ def test_xml_single_record():
 
 def test_xml_text_only_records():
     assert read("<values><v>1</v><v>2</v></values>", "xml").rows == [{"value": "1"}, {"value": "2"}]
+
+
+def test_load_reads_files_and_drops_the_bom(tmp_path):
+    f = tmp_path / "r.csv"
+    f.write_bytes(b"\xef\xbb\xbfa,b\n1,2\n")
+    assert readers.load(str(f)) == ("a,b\n1,2\n", "r.csv")
+
+
+def test_decode_refuses_big_input(monkeypatch):
+    monkeypatch.setattr(readers, "MAX_BYTES", 3)
+    with pytest.raises(ValueError, match="keeps it small"):
+        readers.decode(b"abcd")

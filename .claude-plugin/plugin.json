@@ -1,0 +1,36 @@
+{
+  "name": "fosset",
+  "displayName": "fosset",
+  "version": "0.2.0",
+  "description": "throw json, csv or xml at it and get charts. claude picks the charts, you get a window, claude sees what you see",
+  "author": {
+    "name": "borayil"
+  },
+  "homepage": "https://github.com/borayil/fosset",
+  "repository": "https://github.com/borayil/fosset",
+  "license": "MIT",
+  "keywords": [
+    "charts",
+    "visualization",
+    "data",
+    "json",
+    "csv",
+    "sql"
+  ],
+  "mcpServers": {
+    "fosset": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--quiet",
+        "--frozen",
+        "--project",
+        "${CLAUDE_PLUGIN_ROOT}",
+        "fosset-mcp"
+      ],
+      "env": {
+        "UV_PROJECT_ENVIRONMENT": "${CLAUDE_PLUGIN_DATA}/venv"
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "fosset",
+  "description": "instant charts for whatever data shows up in your session",
+  "owner": { "name": "borayil" },
+  "plugins": [
+    {
+      "name": "fosset",
+      "source": "./",
+      "description": "throw json, csv or xml at it and get charts. claude picks the charts, you get a window, claude sees what you see"
+    }
+  ]
+}

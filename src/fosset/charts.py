@@ -43,7 +43,7 @@ def _line(spec, table, columns):
     is_date = columns[x].kind == "datetime"
     parse_x = to_datetime if is_date else to_number
     y = spec.y[0] if spec.y else None
-    agg = _agg(y)
+    agg = aggregation(y)
 
     xs = _column(table, x, parse_x)
     values = _column(table, y, to_number) if y else None
@@ -102,7 +102,7 @@ def _line(spec, table, columns):
 
 def _bar(spec, table, columns):
     y = spec.y[0] if spec.y else None
-    agg = _agg(y)
+    agg = aggregation(y)
     keys = _column(table, spec.x, _key)
     values = _column(table, y, to_number) if y else None
     groups = defaultdict(list)
@@ -250,7 +250,7 @@ def _fold(points, limit):
     return out
 
 
-def _agg(metric: str | None) -> str:
+def aggregation(metric: str | None) -> str:
     """averages, rates and shares get averaged, everything else gets summed"""
     if metric is None:
         return "sum"

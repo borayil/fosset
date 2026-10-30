@@ -57,7 +57,12 @@ const THEMES = {
 const darkMode = matchMedia("(prefers-color-scheme: dark)");
 let current = 0;
 
-function themed(figure, t) {
+function theme() {
+  return darkMode.matches ? THEMES.dark : THEMES.light;
+}
+
+// el is the div the chart goes into, its size decides how thick bars can be
+function themed(figure, t, el) {
   const data = structuredClone(figure.data);
   const layout = structuredClone(figure.layout);
   let slot = 0;
@@ -110,18 +115,18 @@ function themed(figure, t) {
   // bars max out at 24px thick, the rest is breathing room
   const first = data[0];
   if (first && first.type === "bar") {
-    const slot = (chart.clientHeight - layout.margin.t - layout.margin.b) / first.y.length;
+    const slot = (el.clientHeight - layout.margin.t - layout.margin.b) / first.y.length;
     layout.bargap = Math.max(0.2, 1 - 24 / slot);
   }
   return { data, layout };
 }
 
 function render() {
-  const t = darkMode.matches ? THEMES.dark : THEMES.light;
+  const t = theme();
   for (const [key, value] of Object.entries(t)) {
     if (typeof value === "string") document.body.style.setProperty(`--${key}`, value);
   }
-  const { data, layout } = themed(charts[current], t);
+  const { data, layout } = themed(charts[current], t, chart);
   document.getElementById("pos").textContent = `${current + 1} / ${charts.length}`;
   return Plotly.react(chart, data, layout, { displayModeBar: false });
 }
@@ -151,27 +156,49 @@ function toast(text) {
   el.timer = setTimeout(() => el.classList.remove("show"), 2000);
 }
 
+// null when the page is open in a plain browser (fosset --html) instead of the window
+const api = () => window.pywebview && window.pywebview.api;
+
 async function save() {
-  const url = await Plotly.toImage(chart, {
-    format: "png", width: chart.clientWidth, height: chart.clientHeight, scale: 2,
-  });
-  const path = await window.pywebview.api.save_png(url, current + 1);
+  const size = { width: chart.clientWidth, height: chart.clientHeight, scale: 2 };
+  if (!api()) return Plotly.downloadImage(chart, { format: "png", filename: `fosset-${current + 1}`, ...size });
+  const url = await Plotly.toImage(chart, { format: "png", ...size });
+  const path = await api().save_png(url, current + 1);
   toast(`saved to ${path}`);
+}
+
+// renders every chart into a div off screen so the window you're looking at doesn't flicker
+async function exportAll() {
+  const off = document.createElement("div");
+  off.style.cssText = "position:absolute;left:-20000px;top:0;width:1000px;height:640px";
+  document.body.appendChild(off);
+  for (let i = 0; i < charts.length; i++) {
+    const { data, layout } = themed(charts[i], theme(), off);
+    await Plotly.newPlot(off, data, { ...layout, width: 1000, height: 640 }, { displayModeBar: false });
+    const url = await Plotly.toImage(off, { format: "png", width: 1000, height: 640, scale: 1 });
+    await api().export_png(url, i + 1, charts[i].layout.title.text);
+  }
+  Plotly.purge(off);
+  off.remove();
+  await api().export_done();
 }
 
 addEventListener("keydown", (e) => {
   if (e.key === "ArrowRight") go(1);
   else if (e.key === "ArrowLeft") go(-1);
   else if (e.key === "s" || e.key === "S") save();
-  else if (e.key === "Escape" || e.key === "q") window.pywebview.api.close();
+  else if ((e.key === "Escape" || e.key === "q") && api()) api().close();
 });
 addEventListener("resize", render);
 darkMode.addEventListener("change", render);
 
 document.getElementById("status").textContent = payload.status;
 const firstRender = render();
-const notify = () => firstRender.then(() => window.pywebview.api.rendered());
-if (window.pywebview && window.pywebview.api) notify();
+const notify = () => firstRender.then(() => {
+  api().rendered();
+  if (payload.export) exportAll();
+});
+if (api()) notify();
 else addEventListener("pywebviewready", notify, { once: true });
 </script>
 </body>
