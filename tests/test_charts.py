@@ -107,6 +107,16 @@ def test_columns_are_parsed_once_across_charts(monkeypatch):
     assert len(calls) == len(rows)
 
 
+def test_llm_labels_and_keys():
+    rows = [{"plan": "free", "mrr_eur": 1}, {"plan": "pro", "mrr_eur": 2}]
+    table = Table(["plan", "mrr_eur"], rows)
+    columns = profile(table)
+    columns["mrr_eur"].label = "MRR (€)"
+    fig = build(Spec("bar", "plan", ("mrr_eur",)), table, columns)
+    assert fig["layout"]["xaxis"]["title"]["text"] == "MRR (€)"
+    assert fig["key"] == "bar|plan|mrr_eur|"
+
+
 def test_labels_from_data_are_escaped():
     rows = [{"name": "<b>x</b>", "v": 1}, {"name": "y", "v": 2}]
     fig = figure(Spec("bar", "name", ("v",), title="<i>"), rows)

@@ -2,7 +2,7 @@
 
 import math
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from fosset.readers import Table
@@ -12,6 +12,8 @@ SAMPLE_ROWS = 5000
 # a column gets a kind when 90% of its values fit it
 MATCH_SHARE = 0.9
 TEXT_MIN_LENGTH = 40
+SAMPLE_COUNT = 3
+SAMPLE_LENGTH = 40
 
 _YEAR_MONTH = re.compile(r"^\d{4}-\d{2}$")
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
@@ -24,6 +26,8 @@ class Column:
     kind: str  # number | datetime | category | text | id | empty
     count: int  # values that aren't empty, in the sample
     distinct: int
+    samples: list[str] = field(default_factory=list)  # a few values, so the llm gets what the column is
+    label: str | None = None  # a nicer name from the llm, like "MRR (€)"
 
     @property
     def unique(self) -> bool:
@@ -37,7 +41,8 @@ def profile(table: Table) -> dict[str, Column]:
         values = [r.get(name) for r in sample]
         values = [v for v in values if v is not None and v != ""]
         distinct = len({str(v) for v in values})
-        columns[name] = Column(name, _kind(name, values), len(values), distinct)
+        samples = list(dict.fromkeys(str(v)[:SAMPLE_LENGTH] for v in values[:200]))[:SAMPLE_COUNT]
+        columns[name] = Column(name, _kind(name, values), len(values), distinct, samples)
     return columns
 
 

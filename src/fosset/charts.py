@@ -32,7 +32,10 @@ def build(spec: Spec, table: Table, columns: dict[str, Column]) -> dict:
         "kpi": _kpi,
         "table": _table,
     }
-    return builders[spec.kind](spec, table, columns)
+    figure = builders[spec.kind](spec, table, columns)
+    # lets the viewer keep you on the same chart when the llm picks swap in
+    figure["key"] = "|".join([spec.kind, spec.x or "", ",".join(spec.y), spec.color or ""])
+    return figure
 
 
 def _line(spec, table, columns):
@@ -93,7 +96,7 @@ def _line(spec, table, columns):
         subtitle,
         hovermode="x unified",
         xaxis={"showspikes": True, "spikemode": "across", "spikesnap": "cursor"},
-        yaxis={"title": {"text": esc(human(y)) if y else "Rows"}, "rangemode": "tozero"},
+        yaxis={"title": {"text": esc(_name(columns, y)) if y else "Rows"}, "rangemode": "tozero"},
     )
 
 
@@ -111,7 +114,7 @@ def _bar(spec, table, columns):
     totals = {k: _aggregate(vs, agg) for k, vs in groups.items()}
     ranked = sorted(totals, key=totals.get, reverse=True)
     bars = [(k, totals[k]) for k in ranked]
-    subtitle = [f"{_agg_word(agg)} per {human(spec.x).lower()}"] if y and any(len(vs) > 1 for vs in groups.values()) else []
+    subtitle = [f"{_agg_word(agg)} per {_name(columns, spec.x, capital=False)}"] if y and any(len(vs) > 1 for vs in groups.values()) else []
     if len(ranked) > MAX_BARS:
         rest = ranked[MAX_BARS - 1:]
         bars = bars[:MAX_BARS - 1]
@@ -134,7 +137,7 @@ def _bar(spec, table, columns):
         data,
         " · ".join(subtitle),
         hovermode="closest",
-        xaxis={"title": {"text": esc(human(y)) if y else "Rows"}},
+        xaxis={"title": {"text": esc(_name(columns, y)) if y else "Rows"}},
         yaxis={"type": "category", "autorange": "reversed", "automargin": True},
     )
 
@@ -148,14 +151,14 @@ def _scatter(spec, table, columns):
         "mode": "markers",
         "x": [a for a, _ in pairs],
         "y": [b for _, b in pairs],
-        "hovertemplate": f"{esc(human(x))} %{{x:,.2~f}}<br>{esc(human(y))} %{{y:,.2~f}}<extra></extra>",
+        "hovertemplate": f"{esc(_name(columns, x))} %{{x:,.2~f}}<br>{esc(_name(columns, y))} %{{y:,.2~f}}<extra></extra>",
     }]
     return _figure(
         spec.title,
         data,
         hovermode="closest",
-        xaxis={"title": {"text": esc(human(x))}},
-        yaxis={"title": {"text": esc(human(y))}},
+        xaxis={"title": {"text": esc(_name(columns, x))}},
+        yaxis={"title": {"text": esc(_name(columns, y))}},
     )
 
 
@@ -169,7 +172,7 @@ def _hist(spec, table, columns):
         spec.title,
         data,
         hovermode="closest",
-        xaxis={"title": {"text": esc(human(spec.x))}},
+        xaxis={"title": {"text": esc(_name(columns, spec.x))}},
         yaxis={"title": {"text": "Rows"}},
     )
 
@@ -184,7 +187,7 @@ def _kpi(spec, table, columns):
             "type": "indicator",
             "mode": "number",
             "value": v,
-            "title": {"text": esc(human(name))},
+            "title": {"text": esc(_name(columns, name))},
             "number": {"valueformat": ",.2~f" if abs(v) < 10_000 else ".3~s"},
             "domain": {"row": i // n_cols, "column": i % n_cols},
         }
@@ -220,6 +223,11 @@ def _cached(table, key, compute):
     if key not in table.cache:
         table.cache[key] = compute()
     return table.cache[key]
+
+
+def _name(columns, name, capital=True):
+    """the llm's label for a column if it gave one, otherwise a cleaned up column name"""
+    return columns[name].label or human(name, capital)
 
 
 def _figure(title, data, subtitle="", **layout):

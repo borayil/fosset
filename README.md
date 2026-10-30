@@ -30,7 +30,7 @@ it follows your mac's light or dark mode, and the colors are colorblind safe.
 
 it reads the file, figures out what each column is (numbers, dates, categories, ids) and goes from there. dates plus numbers get line charts, categories get ranked bars, a single row of numbers gets big kpi tiles, and you always get the raw table at the end. the chart it thinks you want most shows up first.
 
-there's also a constraint check that throws out any chart that doesn't fit the data, like a column that isn't there or a bar chart of ids. right now it only checks the built in rules, but it's really there for when the llm starts suggesting charts.
+there's also a constraint check that throws out any chart that doesn't fit the data, like a column that isn't there or a bar chart of ids. everything goes through it, the llm's picks included, so a bad guess just gets dropped instead of breaking the window.
 
 ## speed
 
@@ -40,9 +40,29 @@ to keep it that way there are limits: 25 mb max in, and anything past 200k rows 
 
 `--timing` prints how long each step took if you're curious.
 
-## what's next
+## the llm part
 
-the llm step. the llm only ever sees the column names, types and a couple of sample values, never the actual rows, and all it does is pick which charts to show and write better titles. answers get cached per column layout, so running the same report again doesn't call the llm at all.
+totally optional, the rules do a fine job on their own. but if you want smarter picks and better titles, make `~/.config/fosset/config.toml`:
+
+```toml
+[llm]
+provider = "anthropic"
+model = "claude-opus-5-5"
+# api_key = "sk-ant-..."   # or just export ANTHROPIC_API_KEY
+```
+
+or point it at a local model, anything that speaks the openai chat api works (ollama, lm studio, mlx, llama.cpp):
+
+```toml
+[llm]
+provider = "local"
+url = "http://localhost:11434/v1"
+model = "qwen3"
+```
+
+the window still opens right away with the rule picks. the llm gets asked in the background and its picks swap in when they land, the footer tells you what's going on. if it fails or you're offline you just keep the rule picks.
+
+it only ever sees the column names, their types and 3 sample values per column, never your actual rows. answers get cached per column layout in `~/.cache/fosset/`, so running the same report again is instant and doesn't cost anything. `--no-llm` skips it for one run.
 
 ## dev
 

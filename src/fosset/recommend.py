@@ -66,12 +66,21 @@ def recommend(columns: dict[str, Column], n_rows: int) -> list[Spec]:
         if metrics and n_rows >= 30 and raw_rows and (entity_rows or not dates):
             specs.append(Spec("hist", metrics[0], title=f"Distribution of {human(metrics[0], capital=False)}"))
 
-    specs = [s for s in specs if validate(s, columns)][:MAX_CHARTS]
-    specs.append(Spec("table", title="Data"))
-    return specs
+    return merge([s for s in specs if validate(s, columns, n_rows)])
 
 
-def validate(spec: Spec, columns: dict[str, Column]) -> bool:
+def merge(*spec_lists: list[Spec]) -> list[Spec]:
+    """earlier lists win, so llm picks go first and rule picks fill in the rest. table goes last"""
+    out, seen = [], set()
+    for spec in (s for specs in spec_lists for s in specs):
+        key = (spec.kind, spec.x, spec.y, spec.color)
+        if spec.kind != "table" and key not in seen:
+            seen.add(key)
+            out.append(spec)
+    return out[:MAX_CHARTS] + [Spec("table", title="Data")]
+
+
+def validate(spec: Spec, columns: dict[str, Column], n_rows: int) -> bool:
     """the constraint check: every column has to exist and fit the chart type"""
     named = [n for n in (spec.x, spec.color, *spec.y) if n is not None]
     if any(n not in columns for n in named):
@@ -93,7 +102,7 @@ def validate(spec: Spec, columns: dict[str, Column]) -> bool:
     if spec.kind == "hist":
         return spec.x is not None and kind(spec.x) == "number"
     if spec.kind == "kpi":
-        return bool(spec.y) and all_numbers
+        return n_rows == 1 and bool(spec.y) and all_numbers
     return spec.kind == "table"
 
 

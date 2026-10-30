@@ -1,6 +1,6 @@
 from fosset.profile import Column, profile
 from fosset.readers import Table
-from fosset.recommend import Spec, human, recommend, validate
+from fosset.recommend import Spec, human, merge, recommend, validate
 
 
 def specs_for(rows):
@@ -62,24 +62,33 @@ COLUMNS = {
 
 
 def test_validate_accepts_specs_that_fit_the_columns():
-    assert validate(Spec("line", "day", ("users",), "plan"), COLUMNS)
-    assert validate(Spec("line", "day"), COLUMNS)
-    assert validate(Spec("bar", "plan", ("revenue",)), COLUMNS)
-    assert validate(Spec("scatter", "users", ("revenue",)), COLUMNS)
-    assert validate(Spec("hist", "users"), COLUMNS)
-    assert validate(Spec("kpi", y=("users", "revenue")), COLUMNS)
-    assert validate(Spec("table"), COLUMNS)
+    assert validate(Spec("line", "day", ("users",), "plan"), COLUMNS, 10)
+    assert validate(Spec("line", "day"), COLUMNS, 10)
+    assert validate(Spec("bar", "plan", ("revenue",)), COLUMNS, 10)
+    assert validate(Spec("scatter", "users", ("revenue",)), COLUMNS, 10)
+    assert validate(Spec("hist", "users"), COLUMNS, 10)
+    assert validate(Spec("kpi", y=("users", "revenue")), COLUMNS, 1)
+    assert validate(Spec("table"), COLUMNS, 10)
 
 
 def test_validate_rejects_specs_that_do_not_fit():
-    assert not validate(Spec("line", "day", ("nope",)), COLUMNS)  # missing column
-    assert not validate(Spec("line", "plan", ("users",)), COLUMNS)  # x is not time or number
-    assert not validate(Spec("bar", "plan", ("users", "revenue")), COLUMNS)  # one metric per bar chart
-    assert not validate(Spec("bar", "plan", ("id",)), COLUMNS)  # ids are not metrics
-    assert not validate(Spec("line", "day", ("users",), "users"), COLUMNS)  # color must be a category
-    assert not validate(Spec("scatter", "users"), COLUMNS)
-    assert not validate(Spec("kpi"), COLUMNS)
-    assert not validate(Spec("pie", "plan"), COLUMNS)
+    assert not validate(Spec("line", "day", ("nope",)), COLUMNS, 10)  # missing column
+    assert not validate(Spec("line", "plan", ("users",)), COLUMNS, 10)  # x is not time or number
+    assert not validate(Spec("bar", "plan", ("users", "revenue")), COLUMNS, 10)  # one metric per bar chart
+    assert not validate(Spec("bar", "plan", ("id",)), COLUMNS, 10)  # ids are not metrics
+    assert not validate(Spec("line", "day", ("users",), "users"), COLUMNS, 10)  # color must be a category
+    assert not validate(Spec("scatter", "users"), COLUMNS, 10)
+    assert not validate(Spec("kpi"), COLUMNS, 1)
+    assert not validate(Spec("kpi", y=("users",)), COLUMNS, 10)  # kpi tiles need exactly one row
+    assert not validate(Spec("pie", "plan"), COLUMNS, 10)
+
+
+def test_merge_puts_first_picks_first_and_dedupes():
+    llm_pick = Spec("bar", "plan", ("revenue",), title="Revenue by plan")
+    rule_pick = Spec("bar", "plan", ("revenue",), title="Revenue by plan (rules)")
+    other = Spec("line", "day", ("users",))
+    merged = merge([llm_pick], [rule_pick, other, Spec("table", title="Data")])
+    assert merged == [llm_pick, other, Spec("table", title="Data")]
 
 
 def test_human():

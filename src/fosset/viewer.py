@@ -7,25 +7,41 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 _TEMPLATE = Path(__file__).with_name("viewer.html")
 
 
-def build_html(figures: list[dict]) -> str:
-    # escape < so nothing in the data can close the script tag
-    payload = json.dumps(figures).replace("<", "\\u003c")
+def build_html(figures: list[dict], status: str = "") -> str:
     html = _TEMPLATE.read_text().replace("__PLOTLY__", _plotly_js())
-    return html.replace("__PAYLOAD__", payload)
+    return html.replace("__PAYLOAD__", _js({"charts": figures, "status": status}))
 
 
-def show(figures: list[dict], title: str, stem: str, started: float | None = None) -> None:
+def show(
+    figures: list[dict],
+    title: str,
+    stem: str,
+    started: float | None = None,
+    status: str = "",
+    later: Callable[[], tuple[list[dict] | None, str]] | None = None,
+) -> None:
+    """`later` runs in the background while the window opens (that's the llm call), and
+    whatever charts it comes back with get swapped into the open window"""
     import webview  # slow to import, so only load it when we actually open a window
 
     api = _Api(stem, Path.cwd(), started)
-    window = webview.create_window(title, html=build_html(figures), js_api=api, width=1100, height=720)
+    window = webview.create_window(title, html=build_html(figures, status), js_api=api, width=1100, height=720)
+    window.events.closed += api._closed.set
     api._window = window
+    if later:
+        threading.Thread(target=api._swap_in, args=(later,), daemon=True).start()
     webview.start()
+
+
+def _js(value) -> str:
+    # escape < so nothing in the data can close the script tag
+    return json.dumps(value).replace("<", "\\u003c")
 
 
 class _Api:
@@ -36,6 +52,8 @@ class _Api:
         self._out_dir = out_dir
         self._started = started
         self._window = None
+        self._loaded = threading.Event()
+        self._closed = threading.Event()
 
     def save_png(self, data_url: str, index: int) -> str:
         path = self._out_dir / f"fosset-{self._stem}-{int(index)}.png"
@@ -47,8 +65,16 @@ class _Api:
         return str(path)
 
     def rendered(self) -> None:
+        self._loaded.set()
         if self._started is not None:
             print(f"first chart on screen: {time.perf_counter() - self._started:.2f}s", file=sys.stderr)
+
+    def _swap_in(self, later) -> None:
+        figures, status = later()
+        self._loaded.wait(timeout=10)
+        if self._closed.is_set():
+            return
+        self._window.evaluate_js(f"swapIn({_js(figures)}, {_js(status)})")
 
     def close(self) -> None:
         # pywebview sends our return value back to the page after this returns. if the

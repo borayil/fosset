@@ -29,13 +29,16 @@
 <div id="chart"></div>
 <footer>
   <span id="pos"></span>
+  <span id="status"></span>
   <span><kbd>← →</kbd> flip through · <kbd>s</kbd> save png · <kbd>esc</kbd> close</span>
 </footer>
 <div id="toast"></div>
 <script>__PLOTLY__</script>
 <script id="payload" type="application/json">__PAYLOAD__</script>
 <script>
-const charts = JSON.parse(document.getElementById("payload").textContent);
+const payload = JSON.parse(document.getElementById("payload").textContent);
+let charts = payload.charts;
+let moved = false;  // whether you've flipped away from the first chart yet
 const chart = document.getElementById("chart");
 
 // colorblind safe palette, tuned separately for light and dark
@@ -124,7 +127,19 @@ function render() {
 }
 
 function go(step) {
+  moved = true;
   current = (current + step + charts.length) % charts.length;
+  render();
+}
+
+// the llm's picks arrive after the window is already up. if you haven't flipped
+// anywhere yet you get its best pick, otherwise you stay on the chart you're on
+function swapIn(next, status) {
+  document.getElementById("status").textContent = status;
+  if (!next) return;
+  const key = charts[current].key;
+  charts = next;
+  current = moved ? Math.max(0, charts.findIndex((c) => c.key === key)) : 0;
   render();
 }
 
@@ -153,6 +168,7 @@ addEventListener("keydown", (e) => {
 addEventListener("resize", render);
 darkMode.addEventListener("change", render);
 
+document.getElementById("status").textContent = payload.status;
 const firstRender = render();
 const notify = () => firstRender.then(() => window.pywebview.api.rendered());
 if (window.pywebview && window.pywebview.api) notify();
