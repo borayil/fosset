@@ -24,6 +24,8 @@ a few more things it can do:
 fosset report.json --png charts/              # also save every chart as a png
 fosset report.json --png charts/ --headless   # just the pngs, no window
 fosset report.json --html report.html         # a page you can open in any browser
+fosset report.json --specs picks.json         # just your own picks, {charts, labels} like the llm sends
+fosset report.json --numbers 1.234,5          # write numbers the turkish way this once
 ```
 
 ## use it from claude code
@@ -44,11 +46,13 @@ you need [uv](https://docs.astral.sh/uv/) installed. the very first start downlo
 * s saves the current one as a png in whatever folder you ran it from
 * esc closes it
 
-it follows your mac's light or dark mode, and the colors are colorblind safe.
+it follows your mac's light or dark mode, and the colors are colorblind safe. numbers follow your mac's region too, so in turkey you get 1.464 and 2,5, in the us 1,464 and 2.5.
 
 ## how it picks charts
 
 it reads the file, figures out what each column is (numbers, dates, categories, ids) and goes from there. dates plus numbers get line charts, categories get ranked bars, a single row of numbers gets big kpi tiles, and you always get the raw table at the end. the chart it thinks you want most shows up first.
+
+numbers written out for people get read as numbers too, like `21.985.979 ₺`, `%44` or `$1,234.50`. dots between thousands only count where the decimal mark is a comma (your region, or the setting below), because otherwise `1.464` is just one and a bit.
 
 there's also a constraint check that throws out any chart that doesn't fit the data, like a column that isn't there or a bar chart of ids. everything goes through it, the llm's picks included, so a bad guess just gets dropped instead of breaking the window.
 
@@ -60,9 +64,20 @@ to keep it that way there are limits: 25 mb max in, and anything past 200k rows 
 
 `--timing` prints how long each step took if you're curious.
 
+## settings
+
+everything lives in `~/.config/fosset/config.toml`, and every setting is optional:
+
+```toml
+[display]
+numbers = "1.234,5"   # or "1,234.5". leave it out to follow your mac's region
+```
+
+`--numbers` on the command line, or `numbers` in the plugin's tool, wins over it for one run. with the plugin you can also just tell claude ("always do turkish numbers") and it writes the file for you.
+
 ## the llm part
 
-totally optional, the rules do a fine job on their own. but if you want smarter picks and better titles, make `~/.config/fosset/config.toml`:
+totally optional, the rules do a fine job on their own. but if you want smarter picks and better titles (in the language your columns are in), add this to the config:
 
 ```toml
 [llm]

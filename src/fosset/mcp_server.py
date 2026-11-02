@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from fosset import llm
 from fosset.charts import build, plural
 from fosset.digest import describe
+from fosset.numbers import ENGLISH, example, preferred
 from fosset.profile import Column
 from fosset.profile import profile as profile_columns
 from fosset.readers import Table, detect_format, load, read
@@ -44,7 +45,12 @@ bar: x is a category column, y is one number column (or empty to count rows).
 scatter: x and y are number columns.
 hist: x is a number column.
 kpi: y is 1 to 12 number columns, only for data with exactly one row.
-Picks that don't fit the columns get dropped, and the result says which."""
+Picks that don't fit the columns get dropped, and the result says why. Write titles and labels in the \
+language the user works in.
+
+Numbers follow the user's preference (`[display] numbers` in ~/.config/fosset/config.toml, like "1.234,5"), \
+or their system's region when it isn't set. Pass `numbers` to override it for one call. The same setting reads \
+numbers written out for people, like "21.985.979 ₺" or "%44"."""
 
 server = MCPServer("fosset")
 
@@ -70,11 +76,17 @@ def visualize(
     labels: list[Label] | None = None,
     title: str = "",
     show: bool = True,
+    numbers: str = "",
 ) -> list[str | Image]:
     if bool(path) == bool(data):
         raise ToolError("pass either path or data, exactly one of them")
     if len(data) > MAX_INLINE:
         raise ToolError(f"data is over {MAX_INLINE:,} characters, write it to a file and pass path instead")
+
+    try:
+        separators = preferred(numbers)
+    except ValueError as e:
+        raise ToolError(str(e)) from e
 
     work = Path(tempfile.mkdtemp(prefix="fosset-"))
     try:
@@ -86,6 +98,7 @@ def visualize(
             source = Path(path).expanduser().resolve()
             text, name = load(str(source))
         table = read(text, detect_format(text, source.name))
+        table.separators = separators
     except (ValueError, OSError, ET.ParseError, csv.Error) as e:
         raise ToolError(f"couldn't read that: {e}") from e
     if not table.rows:
@@ -96,18 +109,19 @@ def visualize(
     n_rows = len(table.rows)
     picks = [pick.model_dump() for pick in charts or []]
     answer = {"charts": picks, "labels": [label.model_dump() for label in labels or []]}
-    dropped = [pick for pick in picks if not llm.to_specs({"charts": [pick]}, columns, n_rows)[0]]
     specs = llm.apply_answer(answer, columns, n_rows, recommend(columns, n_rows))
     figures = [build(spec, table, columns) for spec in specs]
 
-    notes = [f'dropped your pick "{p["title"] or p["kind"]}", it doesn\'t fit the columns above' for p in dropped]
+    notes = llm.rejected(answer, columns, n_rows)
+    if separators != ENGLISH:
+        notes.append(f"the window writes numbers like {example(separators)}, the numbers here are plain")
     if table.truncated:
         notes.append(f"only the first {n_rows:,} rows were used")
     images = []
     if _has_display():
         specs_file = work / "specs.json"
         specs_file.write_text(json.dumps(_as_answer(specs, columns)))
-        files, note = _render(source, specs_file, work, title or name, show)
+        files, note = _render(source, specs_file, work, title or name, show, example(separators))
         notes.append(note)
         charts_only = [f for f, figure in zip(files, figures) if figure["data"][0]["type"] != "table"]
         images = [Image(path=work / "png" / f) for f in charts_only[:MAX_IMAGES]]
@@ -120,7 +134,9 @@ def visualize(
     return [_report(name, table, columns, figures, notes), *images]
 
 
-def _render(source: Path, specs_file: Path, work: Path, title: str, show: bool) -> tuple[list[str], str]:
+def _render(
+    source: Path, specs_file: Path, work: Path, title: str, show: bool, numbers_like: str
+) -> tuple[list[str], str]:
     """the window runs in its own process, gui stuff can't live inside the mcp server. it
     saves every chart as a png first, and stays open for the user unless `show` is off"""
     png_dir = work / "png"
@@ -128,6 +144,7 @@ def _render(source: Path, specs_file: Path, work: Path, title: str, show: bool) 
     command = [
         sys.executable, "-m", "fosset", str(source),
         "--specs", str(specs_file), "--png", str(png_dir), "--no-llm", "--title", title,
+        "--numbers", numbers_like,
     ]
     if not show:
         command.append("--headless")

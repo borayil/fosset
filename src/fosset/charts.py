@@ -9,7 +9,8 @@ import statistics
 from collections import defaultdict
 from datetime import datetime, timedelta
 
-from fosset.profile import Column, to_datetime, to_number
+from fosset.numbers import local
+from fosset.profile import Column, to_datetime
 from fosset.readers import Table
 from fosset.recommend import Spec, human
 
@@ -33,6 +34,8 @@ def build(spec: Spec, table: Table, columns: dict[str, Column]) -> dict:
         "table": _table,
     }
     figure = builders[spec.kind](spec, table, columns)
+    # plotly writes every axis tick, hover and tile with these, like 1.464 or 1,464
+    figure["layout"]["separators"] = "".join(table.separators)
     # lets the viewer keep you on the same chart when the llm picks swap in
     figure["key"] = "|".join([spec.kind, spec.x or "", ",".join(spec.y), spec.color or ""])
     return figure
@@ -41,12 +44,12 @@ def build(spec: Spec, table: Table, columns: dict[str, Column]) -> dict:
 def _line(spec, table, columns):
     x = spec.x
     is_date = columns[x].kind == "datetime"
-    parse_x = to_datetime if is_date else to_number
+    parse_x = to_datetime if is_date else columns[x].parse
     y = spec.y[0] if spec.y else None
     agg = aggregation(y)
 
     xs = _column(table, x, parse_x)
-    values = _column(table, y, to_number) if y else None
+    values = _column(table, y, columns[y].parse) if y else None
     series = _column(table, spec.color, _label) if spec.color else None
     keep = [i for i, xv in enumerate(xs) if xv is not None and (values is None or values[i] is not None)]
 
@@ -104,7 +107,7 @@ def _bar(spec, table, columns):
     y = spec.y[0] if spec.y else None
     agg = aggregation(y)
     keys = _column(table, spec.x, _key)
-    values = _column(table, y, to_number) if y else None
+    values = _column(table, y, columns[y].parse) if y else None
     groups = defaultdict(list)
     for i, key in enumerate(keys):
         v = 1.0 if values is None else values[i]
@@ -127,7 +130,7 @@ def _bar(spec, table, columns):
         "orientation": "h",
         "y": [esc(_short(k)) for k, _ in bars],
         "x": values,
-        "text": [compact(v) for v in values],
+        "text": [local(compact(v), table.separators) for v in values],
         "textposition": "outside",
         "cliponaxis": False,
         "hovertemplate": "<b>%{x:,.2~f}</b>  %{y}<extra></extra>",
@@ -144,7 +147,7 @@ def _bar(spec, table, columns):
 
 def _scatter(spec, table, columns):
     x, y = spec.x, spec.y[0]
-    pairs = zip(_column(table, x, to_number), _column(table, y, to_number))
+    pairs = zip(_column(table, x, columns[x].parse), _column(table, y, columns[y].parse))
     pairs = [(a, b) for a, b in pairs if a is not None and b is not None]
     data = [{
         "type": "scattergl" if len(pairs) > WEBGL_POINTS else "scatter",
@@ -165,7 +168,7 @@ def _scatter(spec, table, columns):
 def _hist(spec, table, columns):
     data = [{
         "type": "histogram",
-        "x": [v for v in _column(table, spec.x, to_number) if v is not None],
+        "x": [v for v in _column(table, spec.x, columns[spec.x].parse) if v is not None],
         "hovertemplate": "%{x}<br><b>%{y:,}</b> rows<extra></extra>",
     }]
     return _figure(
@@ -179,7 +182,7 @@ def _hist(spec, table, columns):
 
 def _kpi(spec, table, columns):
     row = table.rows[0]
-    tiles = [(name, to_number(row.get(name))) for name in spec.y]
+    tiles = [(name, columns[name].parse(row.get(name))) for name in spec.y]
     tiles = [(name, v) for name, v in tiles if v is not None]
     n_cols = min(len(tiles), 4)
     data = [
@@ -200,9 +203,9 @@ def _kpi(spec, table, columns):
 def _table(spec, table, columns):
     rows = table.rows[:MAX_TABLE_ROWS]
     if len(table.rows) > len(rows):
-        subtitle = f"First {len(rows):,} of {len(table.rows):,} rows"
+        subtitle = local(f"First {len(rows):,} of {len(table.rows):,} rows", table.separators)
     else:
-        subtitle = plural(len(rows), "row")
+        subtitle = plural(len(rows), "row", table.separators)
     data = [{
         "type": "table",
         "header": {"values": [esc(c) for c in table.columns]},
@@ -321,8 +324,8 @@ def _cell(value) -> str:
     return "" if value is None else esc(_short(str(value)))
 
 
-def plural(n: int, noun: str) -> str:
-    return f"{n:,} {noun}" if n == 1 else f"{n:,} {noun}s"
+def plural(n: int, noun: str, separators: tuple[str, str] = (".", ",")) -> str:
+    return local(f"{n:,} {noun}" if n == 1 else f"{n:,} {noun}s", separators)
 
 
 def esc(text) -> str:

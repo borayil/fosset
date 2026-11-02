@@ -36,9 +36,10 @@ def test_export_names_pngs_in_order_and_writes_done_last(tmp_path):
     url = "data:image/png;base64," + base64.b64encode(b"png-bytes").decode()
     api.export_png(url, 1, "Signups over time by plan")
     api.export_png(url, 2, "&lt;b&gt;Revenue&lt;/b&gt; (€)")
+    api.export_png(url, 3, "Kişi başına ortalama İŞ günü")
     api.export_done()
     assert json.loads((tmp_path / "done.json").read_text()) == {
-        "files": ["01-signups-over-time-by-plan.png", "02-b-revenue-b.png"]
+        "files": ["01-signups-over-time-by-plan.png", "02-b-revenue-b.png", "03-kisi-basina-ortalama-is-gunu.png"]
     }
     assert (tmp_path / "01-signups-over-time-by-plan.png").read_bytes() == b"png-bytes"
 

@@ -1,7 +1,7 @@
 {
   "name": "fosset",
   "displayName": "fosset",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "throw json, csv or xml at it and get charts. claude picks the charts, you get a window, claude sees what you see",
   "author": {
     "name": "borayil"

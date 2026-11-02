@@ -5,22 +5,31 @@ so the same report never costs a second call"""
 import hashlib
 import json
 import os
-import tomllib
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+from fosset import config as preferences
 from fosset.profile import Column
 from fosset.recommend import Spec, merge, validate
 
-CONFIG_PATH = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "fosset" / "config.toml"
 CACHE_PATH = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "fosset" / "llm.json"
 DEFAULT_MODEL = "claude-opus-5-5"
 TIMEOUT = 30
 # bump this when the prompt changes so old cached answers get ignored
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 # these models can hand a declined request to another model on anthropic's side
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
+
+# what each kind takes, for telling people why their pick didn't fit
+NEEDS = {
+    "line": "x a datetime or number column, y one number column or none, color a category column or none",
+    "bar": "x a category column, y one number column or none",
+    "scatter": "x and y number columns",
+    "hist": "x a number column",
+    "kpi": "y 1 to 12 number columns, on data with exactly one row",
+    "": "a kind of line, bar, scatter, hist or kpi",
+}
 
 SYSTEM = """You pick charts for a data viewer. You get a summary of a table: its columns with their kind, \
 how many distinct values they have and a few samples. You never see the rows.
@@ -40,7 +49,8 @@ and skip charts that would say nothing.
 
 Titles are short and plain in sentence case, like "Orders over time by status" or "Revenue by plan". Don't put \
 a time unit like daily or weekly in titles, the viewer picks that. Also give a short human label for every \
-column you use, with the unit when it is obvious from the name, like "MRR (€)" for mrr_eur."""
+column you use, with the unit when it is obvious from the name, like "MRR (€)" for mrr_eur. Write titles and \
+labels in the language the column names are in, so Turkish columns get Turkish titles."""
 
 SCHEMA = {
     "type": "object",
@@ -87,12 +97,9 @@ class Config:
     url: str | None = None
 
 
-def load_config(path: Path | None = None) -> Config | None:
+def load_config() -> Config | None:
     """no config file, or no [llm] section, means no llm. fosset just uses its rules then"""
-    path = path or CONFIG_PATH
-    if not path.exists():
-        return None
-    llm = tomllib.loads(path.read_text()).get("llm")
+    llm = preferences.read().get("llm")
     if not llm:
         return None
     provider = llm.get("provider", "anthropic")
@@ -156,23 +163,35 @@ def ask(config: Config, summary: dict) -> dict:
 
 def to_specs(answer: dict, columns: dict[str, Column], n_rows: int) -> tuple[list[Spec], dict[str, str]]:
     """turn the answer into specs, dropping anything that fails the constraint check"""
-    specs = []
-    for chart in answer.get("charts", []):
-        spec = Spec(
-            chart.get("kind", ""),
-            chart.get("x") or None,
-            tuple(chart.get("y") or ()),
-            chart.get("color") or None,
-            chart.get("title", ""),
-        )
-        if validate(spec, columns, n_rows):
-            specs.append(spec)
+    specs = [spec for spec in map(_spec, answer.get("charts", [])) if validate(spec, columns, n_rows)]
     labels = {
         item["column"]: item["label"]
         for item in answer.get("labels", [])
         if item.get("column") in columns and item.get("label")
     }
     return specs, labels
+
+
+def rejected(answer: dict, columns: dict[str, Column], n_rows: int) -> list[str]:
+    """why each pick that fails the constraint check got dropped, so whoever wrote it can fix it"""
+    notes = []
+    for spec in map(_spec, answer.get("charts", [])):
+        if validate(spec, columns, n_rows):
+            continue
+        named = dict.fromkeys(n for n in (spec.x, *spec.y, spec.color) if n)
+        found = ", ".join(f"{n} is {columns[n].kind}" if n in columns else f"{n} isn't a column" for n in named)
+        note = f'dropped "{spec.title or spec.kind}": {spec.kind or "a pick"} needs {NEEDS.get(spec.kind, NEEDS[""])}'
+        notes.append(f"{note}. here {found}" if found else note)
+    return notes
+
+
+def _spec(chart: dict) -> Spec:
+    y = chart.get("y") or ()
+    if isinstance(y, str):
+        y = (y,)  # one column name on its own is fine too
+    return Spec(
+        chart.get("kind", ""), chart.get("x") or None, tuple(y), chart.get("color") or None, chart.get("title", "")
+    )
 
 
 def apply_answer(answer: dict, columns: dict[str, Column], n_rows: int, rules: list[Spec]) -> list[Spec]:

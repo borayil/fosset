@@ -9,7 +9,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from fosset import llm
+from fosset import llm, numbers
 from fosset.charts import build, plural
 from fosset.profile import profile
 from fosset.readers import MAX_BYTES, MAX_ROWS, Table, decode, detect_format, load, read
@@ -23,7 +23,8 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("path", nargs="?", help="the file to chart, leave it out (or pass -) to read from a pipe")
     parser.add_argument("--format", choices=["json", "csv", "xml"], help="skip guessing the format")
     parser.add_argument("--title", help="what to call the data in the window title")
-    parser.add_argument("--specs", metavar="FILE", help="use these chart picks ({charts, labels} json) instead of guessing")
+    parser.add_argument("--specs", metavar="FILE", help="show just these chart picks ({charts, labels} json)")
+    parser.add_argument("--numbers", metavar="LIKE", help='write and read numbers like "1.234,5" or "1,234.5"')
     parser.add_argument("--no-llm", action="store_true", help="skip the llm and just use the rules")
     parser.add_argument("--png", metavar="DIR", help="also save every chart as a png in DIR")
     parser.add_argument("--headless", action="store_true", help="don't show a window, just save the pngs (needs --png)")
@@ -38,8 +39,10 @@ def main(argv: list[str] | None = None) -> None:
             print(f"{stage}: {time.perf_counter() - started:.2f}s", file=sys.stderr)
 
     try:
+        separators = numbers.preferred(args.numbers)
         text, name = _read_input(args.path)
         table = read(text, args.format or detect_format(text, name))
+        table.separators = separators
         answer = json.loads(Path(args.specs).read_text()) if args.specs else None
     except (ValueError, OSError, ET.ParseError, csv.Error) as e:
         sys.exit(f"fosset: {e}")
@@ -57,7 +60,12 @@ def main(argv: list[str] | None = None) -> None:
     live_window = not (args.html or args.headless)
 
     if answer is not None:
-        specs = llm.apply_answer(answer, columns, n_rows, rules)
+        for note in llm.rejected(answer, columns, n_rows):
+            print(f"fosset: {note}", file=sys.stderr)
+        specs = llm.apply_answer(answer, columns, n_rows, [])
+        if len(specs) == 1 and answer.get("charts"):  # every pick got dropped, only the table is left
+            print("fosset: none of the picks fit, showing fosset's own", file=sys.stderr)
+            specs = rules
     else:
         config = None if args.no_llm else _llm_config()
         if config and llm.worth_asking(columns):
@@ -79,7 +87,7 @@ def main(argv: list[str] | None = None) -> None:
         write_html(figures, Path(args.html), status)
         print(args.html)
         return
-    title = f"fosset · {args.title or name} · {plural(n_rows, 'row')}"
+    title = f"fosset · {args.title or name} · {plural(n_rows, 'row', table.separators)}"
     show(
         figures,
         title,

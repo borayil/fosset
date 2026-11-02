@@ -132,3 +132,21 @@ def test_labels_from_data_are_escaped():
 )
 def test_compact(value, expected):
     assert compact(value) == expected
+
+
+def test_turkish_numbers_in_labels_layout_and_tiles():
+    rows = [{"kisi": k, "ciro": c} for k, c in [("Ayşe", "21.985.979 ₺"), ("Can", "1.464 ₺"), ("Ece", "820 ₺")]]
+    table = Table(["kisi", "ciro"], rows, separators=(",", "."))
+    columns = profile(table)
+    fig = build(Spec("bar", "kisi", ("ciro",)), table, columns)
+    assert fig["data"][0]["x"] == [21985979.0, 1464.0, 820.0]
+    assert fig["data"][0]["text"] == ["22M", "1.464", "820"]
+    assert fig["layout"]["separators"] == ",."
+
+    big = Table(["n"], [{"n": i} for i in range(1200)], separators=(",", "."))
+    assert build(Spec("table", title="Data"), big, profile(big))["layout"]["title"]["subtitle"]["text"] == (
+        "First 500 of 1.200 rows"
+    )
+
+    one = Table(["ciro"], [{"ciro": "%44"}], separators=(",", "."))
+    assert build(Spec("kpi", y=("ciro",)), one, profile(one))["data"][0]["value"] == 44.0

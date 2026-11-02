@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import anthropic
 import pytest
 
-from fosset import llm
+from fosset import config, llm
 from fosset.llm import Config, LLMError
 from fosset.profile import Column
 from fosset.recommend import Spec
@@ -30,8 +30,8 @@ ANSWER = {
 
 
 def write_config(text):
-    llm.CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    llm.CONFIG_PATH.write_text(text)
+    config.CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    config.CONFIG_PATH.write_text(text)
 
 
 def test_no_config_means_no_llm():
@@ -183,3 +183,29 @@ def test_ask_local(local_llm):
 def test_local_llm_not_running():
     with pytest.raises(LLMError, match="couldn't reach"):
         llm.ask(Config("local", "qwen3", url="http://127.0.0.1:9/v1"), {"columns": []})
+
+
+def test_a_lone_column_name_in_y_counts_as_one_column():
+    answer = {"charts": [{"kind": "bar", "x": "plan", "y": "mrr_eur", "color": "", "title": "MRR by plan"}]}
+    specs, _ = llm.to_specs(answer, COLUMNS, 10)
+    assert specs == [Spec("bar", "plan", ("mrr_eur",), None, "MRR by plan")]
+    assert llm.rejected(answer, COLUMNS, 10) == []
+
+
+def test_rejected_says_why():
+    notes = llm.rejected(ANSWER, COLUMNS, 10)
+    assert notes == [
+        'dropped "ids are not metrics": bar needs x a category column, y one number column or none. '
+        "here plan is category, user_id is id",
+        'dropped "made up column": line needs x a datetime or number column, y one number column or none, '
+        "color a category column or none. here nope isn't a column",
+        'dropped "kpi needs one row": kpi needs y 1 to 12 number columns, on data with exactly one row. '
+        "here mrr_eur is number",
+    ]
+    assert llm.rejected({"charts": [{"kind": "pie", "x": "plan"}]}, COLUMNS, 10) == [
+        'dropped "pie": pie needs a kind of line, bar, scatter, hist or kpi. here plan is category'
+    ]
+
+
+def test_the_prompt_asks_for_titles_in_the_data_language():
+    assert "language the column names are in" in llm.SYSTEM

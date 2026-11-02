@@ -17,9 +17,9 @@ def renders(monkeypatch):
     """fake the window process: write a png per chart in the final picks and say it's done"""
     calls = []
 
-    def fake_render(source, specs_file, work, title, show):
+    def fake_render(source, specs_file, work, title, show, numbers_like):
         answer = json.loads(specs_file.read_text())
-        calls.append({"source": source, "answer": answer, "title": title, "show": show})
+        calls.append({"source": source, "answer": answer, "title": title, "show": show, "numbers": numbers_like})
         (work / "png").mkdir()
         files = [f"{i:02d}-chart.png" for i in range(1, len(answer["charts"]) + 2)]  # plus the table
         for name in files:
@@ -53,11 +53,28 @@ def test_claudes_picks_go_first_and_bad_ones_get_reported(renders):
     )
     report = result[0]
     assert "1. Revenue by country [bar x=country y=amount]" in report
-    assert 'dropped your pick "Revenue by planet"' in report
+    assert 'dropped "Revenue by planet": bar needs x a category column' in report
+    assert "here planet isn't a column, amount is number" in report
     assert '  amount ("Amount (€)"): number' in report
     answer = renders[0]["answer"]
     assert answer["charts"][0]["title"] == "Revenue by country"  # the window shows the same order
     assert answer["labels"] == [{"column": "amount", "label": "Amount (€)"}]
+
+
+def test_numbers_follow_the_preference_and_can_be_overridden(renders):
+    data = '[{"kisi": "Ayşe", "ciro": "21.985.979 ₺"}, {"kisi": "Can", "ciro": "1.464 ₺"}]'
+    report = visualize(data=data, numbers="1.234,5")[0]
+    assert "  ciro: number" in report
+    assert "biggest first: Ayşe 22M, Can 1,464" in report  # the digest stays plain for claude
+    assert "the window writes numbers like 1.234,5" in report
+    assert renders[0]["numbers"] == "1.234,5"
+
+    report = visualize(data=data)[0]  # the test machine counts as english
+    assert "  ciro: category" in report and "the window writes" not in report
+    assert renders[1]["numbers"] == "1,234.5"
+
+    with pytest.raises(ToolError, match="should look like"):
+        visualize(data=data, numbers="turkish")
 
 
 def test_inline_data(renders):

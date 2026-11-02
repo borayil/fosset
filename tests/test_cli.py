@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from fosset import cli, llm, readers
+from fosset import cli, config, llm, readers
 
 EXAMPLES = Path(__file__).parent.parent / "examples"
 
@@ -38,7 +38,7 @@ def shown(monkeypatch):
 
 @pytest.fixture
 def llm_on(monkeypatch):
-    llm.CONFIG_PATH.write_text('[llm]\nprovider = "anthropic"\n')
+    config.CONFIG_PATH.write_text('[llm]\nprovider = "anthropic"\n')
     asked = []
 
     def fake_ask(config, summary):
@@ -125,7 +125,7 @@ def test_no_llm_flag(shown, llm_on):
 
 
 def test_broken_config_falls_back_to_rules(shown, capsys):
-    llm.CONFIG_PATH.write_text('[llm]\nprovider = "openai"\n')
+    config.CONFIG_PATH.write_text('[llm]\nprovider = "openai"\n')
     cli.main([str(EXAMPLES / "signups.json")])
     assert shown.later is None
     assert "ignoring the llm config" in capsys.readouterr().err
@@ -159,3 +159,43 @@ def test_html_writes_a_page_and_opens_nothing(shown, tmp_path, capsys):
     assert not shown
     assert '"export": false' in page.read_text()
     assert capsys.readouterr().out.strip() == str(page)
+
+
+def test_specs_show_only_those_picks_and_say_what_got_dropped(shown, tmp_path, capsys):
+    specs = tmp_path / "specs.json"
+    specs.write_text(json.dumps({"charts": [
+        {"kind": "bar", "x": "plan", "y": "signups", "title": "Kayıtlar plana göre"},  # a lone y string works
+        {"kind": "bar", "x": "plan", "y": ["ghost"], "title": "Hayalet"},
+    ]}))
+    cli.main([str(EXAMPLES / "signups.json"), "--specs", str(specs)])
+    figures, _, _ = shown[0]
+    assert [f["layout"]["title"]["text"] for f in figures] == ["Kayıtlar plana göre", "Data"]
+    assert 'fosset: dropped "Hayalet": bar needs' in capsys.readouterr().err
+
+
+def test_specs_that_all_miss_fall_back_to_the_rules(shown, tmp_path, capsys):
+    specs = tmp_path / "specs.json"
+    specs.write_text(json.dumps({"charts": [{"kind": "bar", "x": "ghost", "title": "Nope"}]}))
+    cli.main([str(EXAMPLES / "signups.json"), "--specs", str(specs)])
+    figures, _, _ = shown[0]
+    assert len(figures) > 2
+    assert "none of the picks fit" in capsys.readouterr().err
+
+
+def test_numbers_come_from_the_flag_or_the_config(shown, tmp_path):
+    rows = tmp_path / "big.csv"
+    rows.write_text("n\n" + "\n".join(str(i) for i in range(1500)))
+    cli.main([str(rows), "--numbers", "1.234,5"])
+    assert shown[0][1] == "fosset · big.csv · 1.500 rows"
+    assert shown[0][0][0]["layout"]["separators"] == ",."
+
+    config.CONFIG_PATH.write_text('[display]\nnumbers = "1.234,5"\n')
+    cli.main([str(rows)])
+    assert shown[1][1] == "fosset · big.csv · 1.500 rows"
+    cli.main([str(rows), "--numbers", "1,234.5"])
+    assert shown[2][1] == "fosset · big.csv · 1,500 rows"
+
+
+def test_bad_numbers_flag(shown):
+    with pytest.raises(SystemExit, match="should look like"):
+        cli.main([str(EXAMPLES / "signups.json"), "--numbers", "tr"])

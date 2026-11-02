@@ -1,10 +1,11 @@
 """figures out what kind of stuff each column holds"""
 
-import math
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
+from fosset.numbers import readers, to_number
 from fosset.readers import Table
 
 # only look at the first rows so big files stay fast
@@ -28,6 +29,8 @@ class Column:
     distinct: int
     samples: list[str] = field(default_factory=list)  # a few values, so the llm gets what the column is
     label: str | None = None  # a nicer name from the llm, like "MRR (€)"
+    # how a number column gets read, plain or written out for people like "21.985.979 ₺"
+    parse: Callable[[object], float | None] = field(default=to_number, repr=False, compare=False)
 
     @property
     def unique(self) -> bool:
@@ -42,18 +45,25 @@ def profile(table: Table) -> dict[str, Column]:
         values = [v for v in values if v is not None and v != ""]
         distinct = len({str(v) for v in values})
         samples = list(dict.fromkeys(str(v)[:SAMPLE_LENGTH] for v in values[:200]))[:SAMPLE_COUNT]
-        columns[name] = Column(name, _kind(name, values), len(values), distinct, samples)
+        parse = _number_reader(values, table.separators)
+        kind = _kind(name, values, parse is not None)
+        columns[name] = Column(name, kind, len(values), distinct, samples, parse=parse or to_number)
     return columns
 
 
-def _kind(name: str, values: list) -> str:
+def _number_reader(values: list, separators: tuple[str, str]) -> Callable | None:
+    """the first way of reading numbers that fits the column, if any does"""
+    return next((parse for parse in readers(separators) if values and _share(values, parse) >= MATCH_SHARE), None)
+
+
+def _kind(name: str, values: list, numbers: bool) -> str:
     if not values:
         return "empty"
     if all(isinstance(v, bool) or str(v).lower() in ("true", "false") for v in values):
         return "category"
     if _is_id_name(name) or _share(values, lambda v: _UUID.match(str(v))) >= MATCH_SHARE:
         return "id"
-    if _share(values, to_number) >= MATCH_SHARE:
+    if numbers:
         return "number"
     if _share(values, to_datetime) >= MATCH_SHARE:
         return "datetime"
@@ -69,21 +79,6 @@ def _share(values: list, test) -> float:
 def _is_id_name(name: str) -> bool:
     lower = name.lower()
     return lower in ("id", "uuid") or lower.endswith(("_id", ".id", "_uuid")) or name.endswith("Id")
-
-
-def to_number(value) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        number = float(value)
-    elif isinstance(value, str):
-        try:
-            number = float(value)
-        except ValueError:
-            return None
-    else:
-        return None
-    return number if math.isfinite(number) else None
 
 
 def to_datetime(value) -> datetime | None:

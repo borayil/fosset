@@ -87,3 +87,35 @@ def test_to_number(value, expected):
 )
 def test_to_datetime(value, expected):
     assert to_datetime(value) == expected
+
+
+def kinds_with(rows, separators):
+    columns = list(dict.fromkeys(k for r in rows for k in r))
+    return profile(Table(columns, rows, separators=separators))
+
+
+def test_numbers_written_out_for_people_with_a_turkish_hint():
+    rows = [
+        {"kisi": "1.464", "ciro": "21.985.979 ₺", "oran": "%44", "puan": "12.5", "kesir": "0.875"},
+        {"kisi": "820", "ciro": "4.120 ₺", "oran": "%7", "puan": "3.25", "kesir": "1.500"},
+    ]
+    columns = kinds_with(rows, (",", "."))
+    assert {c.name: c.kind for c in columns.values()} == dict.fromkeys(rows[0], "number")
+    assert [columns["kisi"].parse(r["kisi"]) for r in rows] == [1464.0, 820.0]
+    assert columns["ciro"].parse("21.985.979 ₺") == 21985979.0
+    # columns that can't be the turkish way keep the plain dot decimal
+    assert [columns["puan"].parse(r["puan"]) for r in rows] == [12.5, 3.25]
+    assert [columns["kesir"].parse(r["kesir"]) for r in rows] == [0.875, 1.5]
+
+
+def test_without_the_hint_dots_stay_decimals():
+    rows = [{"kisi": "1.464", "ciro": "21.985.979 ₺"}, {"kisi": "820", "ciro": "4.120 ₺"}]
+    columns = kinds_with(rows, (".", ","))
+    assert columns["kisi"].kind == "number" and columns["kisi"].parse("1.464") == 1.464
+    assert columns["ciro"].kind == "category"  # can't be read as one english number
+
+
+def test_english_formatted_strings():
+    rows = [{"revenue": "$1,234.50"}, {"revenue": "$980.00"}, {"revenue": "$12,000"}]
+    column = kinds_with(rows, (".", ","))["revenue"]
+    assert column.kind == "number" and column.parse("$12,000") == 12000.0

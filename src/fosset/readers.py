@@ -27,6 +27,8 @@ class Table:
     columns: list[str]
     rows: list[dict]
     truncated: bool = False
+    # (decimal mark, thousands separator) for reading and showing numbers, see numbers.py
+    separators: tuple[str, str] = (".", ",")
     # parsed columns, shared by all the charts built from this table
     cache: dict = field(default_factory=dict, repr=False, compare=False)
 

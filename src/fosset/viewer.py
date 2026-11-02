@@ -8,6 +8,7 @@ import re
 import sys
 import threading
 import time
+import unicodedata
 from collections.abc import Callable
 from pathlib import Path
 
@@ -75,8 +76,7 @@ class _Api:
         self._closed = threading.Event()
 
     def export_png(self, data_url: str, index: int, title: str) -> None:
-        slug = re.sub(r"[^a-z0-9]+", "-", html.unescape(title).lower()).strip("-")[:40] or "chart"
-        path = self._png_dir / f"{int(index):02d}-{slug}.png"
+        path = self._png_dir / f"{int(index):02d}-{_slug(title)}.png"
         path.write_bytes(base64.b64decode(data_url.split(",", 1)[1]))
         self._exported.append(path.name)
 
@@ -120,6 +120,13 @@ class _Api:
             self._window.destroy()
 
         threading.Thread(target=destroy, daemon=True).start()
+
+
+def _slug(title: str) -> str:
+    """an ascii file name from a chart title, so "Kişi başına not" becomes kisi-basina-not"""
+    text = html.unescape(title).lower().replace("ı", "i")  # the dotless i has no plain letter inside it
+    text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", text).strip("-")[:40] or "chart"
 
 
 def _plotly_js() -> str:
