@@ -1,44 +1,59 @@
+<img src=".claude-plugin/icon.png" width="96" alt="">
+
 # fosset
 
-so basically you give it data and it gives you charts. json, csv or xml, a file or whatever's on your clipboard, and voila, a window pops up with the charts that actually make sense for it. no prompting, no picking axes, no waiting around.
+a claude code plugin that charts your data. when a query result, metrics dump, benchmark or cost breakdown shows up in your session, claude hands it to fosset, a window pops up with the charts that actually make sense for it, and claude gets the same charts back. so you're both looking at the same thing.
 
-it came from a pretty simple annoyance: claude spits out sql reports as json all the time (usage, metrics, that kind of stuff) and staring at raw json is not it. now i just pipe it in.
+it came from a pretty simple annoyance: claude spits out sql reports as json all the time (usage, metrics, that kind of stuff) and staring at raw json is not it.
 
-## run it
+## install
 
-```
-uv run fosset examples/orders.csv
-pbpaste | uv run fosset
-```
-
-or install it once and use it from anywhere:
+in your terminal:
 
 ```
-uv tool install -e .
-fosset report.json
+claude plugin install fosset --marketplace borayil/fosset
 ```
 
-a few more things it can do:
+or inside a claude code session:
 
 ```
-fosset report.json --png charts/              # also save every chart as a png
-fosset report.json --png charts/ --headless   # just the pngs, no window
-fosset report.json --html report.html         # a page you can open in any browser
-fosset report.json --specs picks.json         # just your own picks, {charts, labels} like the llm sends
-fosset report.json --numbers 1.234,5          # write numbers the turkish way this once
+/plugin marketplace add borayil/fosset
+/plugin install fosset@fosset
 ```
 
-## use it from claude code
+you need [uv](https://docs.astral.sh/uv/) installed. no api key needed since claude is the llm here. the very first start downloads fosset's dependencies (about 20s, once), after that it starts instantly.
 
-fosset is also a claude code plugin. claude picks the charts, a window pops up for you, and claude gets the numbers plus pngs of the charts back, so it sees what you see. no api key needed since claude is the llm here, and your data never leaves your machine.
+## use it
+
+then just work like normal. when there's something worth charting, claude charts it. or ask it to, or run `/fosset:visualize path/to/file.json`. comparing options for a decision works too, claude lays them out as rows and charts them.
+
+say you ask claude to chart `examples/orders.csv`. you get a window, you flip through the charts:
+
+![a line chart of order amounts per week, split by paid, pending and refunded](docs/chart.png)
+
+and along with pngs of the first 4 charts, claude gets the numbers behind every chart:
 
 ```
-/plugin install fosset --marketplace borayil/fosset
+orders.csv: 400 rows, 5 columns
+...
+2. Amount over time by status [line x=created_at y=amount color=status]
+  paid: 18 points, from 483.7 (2026-06-29) to 281.67 (2026-10-26), low 281.67 (2026-10-26), high 1,412.68 (2026-07-27)
+  ...
+3. Amount by status [bar x=status y=amount]
+  3 bars, biggest first: paid 13.9K, pending 1,378.57, refunded 771.5. total 16K
 ```
 
-then just work like normal. when a query result, metrics dump, benchmark or cost breakdown shows up, claude charts it. or ask it to, or run `/fosset:visualize path/to/file.json`. comparing options for a decision works too, claude lays them out as rows and charts them.
+so when it tells you paid orders are 13.9k of the 16k total, that's the real number and not a guess from the picture.
 
-you need [uv](https://docs.astral.sh/uv/) installed. the very first start downloads fosset's dependencies (about 20s, once), after that it starts instantly. windows and pngs are macos only for now, anywhere else you get the numbers plus an html file you can open in a browser.
+fosset picks the charts on its own first. if they miss what you asked about, claude asks for specific ones and those go first. it draws line, bar, scatter, histogram, kpi tiles and a table. for anything else, like a pie, a map or two y axes, claude can still write a script.
+
+## where your data goes
+
+fosset runs on your machine and the plugin doesn't call anything. what claude gets back, the numbers and the pngs, is part of your claude session like any other tool result.
+
+## where it runs
+
+built and tested on macos. over ssh or on a linux box with no display you get the numbers plus an html file you can open in a browser. windows and desktop linux are untested.
 
 ## in the window
 
@@ -54,15 +69,13 @@ it reads the file, figures out what each column is (numbers, dates, categories, 
 
 numbers written out for people get read as numbers too, like `21.985.979 ₺`, `%44` or `$1,234.50`. dots between thousands only count where the decimal mark is a comma (your region, or the setting below), because otherwise `1.464` is just one and a bit.
 
-there's also a constraint check that throws out any chart that doesn't fit the data, like a column that isn't there or a bar chart of ids. everything goes through it, the llm's picks included, so a bad guess just gets dropped instead of breaking the window.
+there's also a constraint check that throws out any chart that doesn't fit the data, like a column that isn't there or a bar chart of ids. everything goes through it, claude's picks included, so a bad guess just gets dropped instead of breaking the window, and claude gets told why.
 
 ## speed
 
 the whole point is that it's fast. on my m5 a normal report goes from command to chart in about half a second, and a 200k row file takes around 1.7s. the very first launch after installing takes a few seconds while macos warms up webkit, after that it's quick.
 
 to keep it that way there are limits: 25 mb max in, and anything past 200k rows gets cut off.
-
-`--timing` prints how long each step took if you're curious.
 
 ## settings
 
@@ -73,11 +86,33 @@ everything lives in `~/.config/fosset/config.toml`, and every setting is optiona
 numbers = "1.234,5"   # or "1,234.5". leave it out to follow your mac's region
 ```
 
-`--numbers` on the command line, or `numbers` in the plugin's tool, wins over it for one run. with the plugin you can also just tell claude ("always do turkish numbers") and it writes the file for you.
+you can also just tell claude ("always do turkish numbers") and it writes the file for you. `numbers` in the plugin's tool, or `--numbers` on the command line, wins over it for one run.
 
-## the llm part
+## without claude
 
-totally optional, the rules do a fine job on their own. but if you want smarter picks and better titles (in the language your columns are in), add this to the config:
+fosset is a plain cli too. give it json, csv or xml, a file or whatever's on your clipboard, and voila, same window. no prompting, no picking axes, no waiting around.
+
+```
+uv tool install git+https://github.com/borayil/fosset
+fosset report.json
+pbpaste | fosset
+```
+
+a few more things it can do:
+
+```
+fosset report.json --png charts/              # also save every chart as a png
+fosset report.json --png charts/ --headless   # just the pngs, no window
+fosset report.json --html report.html         # a page you can open in any browser
+fosset report.json --specs picks.json         # just your own picks, {charts, labels} like the llm sends
+fosset report.json --numbers 1.234,5          # write numbers the turkish way this once
+```
+
+`--timing` prints how long each step took if you're curious.
+
+### the cli's llm step
+
+this is only for the cli, the plugin doesn't use it since claude already does that job. totally optional, the rules do a fine job on their own. but if you want smarter picks and better titles (in the language your columns are in), add this to the config:
 
 ```toml
 [llm]
@@ -102,6 +137,9 @@ it only ever sees the column names, their types and 3 sample values per column, 
 ## dev
 
 ```
+git clone https://github.com/borayil/fosset
+cd fosset
 uv sync
 uv run pytest
+uv run fosset examples/orders.csv
 ```

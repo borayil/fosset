@@ -5,7 +5,7 @@ description: Chart JSON, CSV or XML data in a native window with fosset, and loo
 
 # Visualize data with fosset
 
-The `visualize` tool from the fosset MCP server opens a chart window for the user and returns a numeric digest of every chart plus PNGs of the first few, so you and the user look at the same charts. It runs locally; nothing is sent anywhere.
+The `visualize` tool from the fosset MCP server opens a chart window for the user and returns a numeric digest of every chart plus PNGs of the first few, so you and the user look at the same charts. It runs locally and makes no network calls of its own; what it returns to you is part of this session, like any other tool result.
 
 ## When to use it
 

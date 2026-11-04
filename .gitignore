@@ -3,4 +3,5 @@ __pycache__/
 .pytest_cache/
 *.png
 !.claude-plugin/icon.png
+!docs/chart.png
 .DS_Store
